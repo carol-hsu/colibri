@@ -32,4 +32,4 @@ RUN go install -ldflags "-s -w -X main.version=$VERSION" metrics-grabber
 # runtime image
 FROM gcr.io/google_containers/ubuntu-slim:0.14
 COPY --from=builder /go/bin/metrics-grabber /usr/bin/metrics-grabber
-ENTRYPOINT ["metrics-grabber"]
+CMD ["metrics-grabber"]

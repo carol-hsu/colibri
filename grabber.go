@@ -19,20 +19,63 @@ import (
     "time"
     "flag"
     "fmt"
+    "log"
+    "io/ioutil"
+    "strings"
 )
 
-func main () {
+func findEth0Index(data string) int {
+//    data_list = strings.Split(data, "\n")
+    for i, d := range strings.Split(data, "\n") {
+        if strings.Contains(d, "eth0") {
+            return i
+        }
+    }
+    return -1
+}
 
-    var pid int
+func scrapeNetMetrics(interval int, metrics_path string) []string {
+
+    var outputs [iterates]string
+}
+
+func main() {
+
+    var pid string
     var interval_ms int
+    const iterates = 10
 
-    flag.IntVar(&pid, "pid", 0, "The process ID of the container.")
-    flag.IntVar(&interval_ms, "freq", 5, "The scraping time of metrics collection.")
+    flag.StringVar(&pid, "pid", "0", "The process ID of the container.")
+    flag.IntVar(&interval_ms, "freq", 5, "The scraping time of metrics collection in millisecond.")
     flag.Parse()
 
-    for i:=0; i < 10; i++ {
-        fmt.Printf("get data %d from %d\n", i, pid)
+    if interval_ms <= 0 {
+        log.Print("Monitoring process cannot be processed with interval_ms less and equal 0.")
+        return
+    }
+
+    //%% print starting time
+
+    var outputs [iterates]string
+    for i := 0; i < iterates; i++ {
+        net_stat, err := ioutil.ReadFile("/tmp/proc/"+pid+"/net/dev")
+
+        if err != nil {
+            log.Fatal(err)
+        }
+        outputs[i] = string(net_stat)
         time.Sleep(time.Duration(interval_ms) * time.Millisecond)
     }
 
+    eth0_idx := findEth0Index(outputs[0])
+
+    if eth0_idx < 0 {
+        log.Print("No eth0's info.")
+        return
+    }
+
+    for i := 0; i < iterates; i++ {
+        metrics := strings.Fields(strings.Split(outputs[i],"\n")[eth0_idx])
+        fmt.Printf("%s %s %s %s \n", metrics[1], metrics[2], metrics[9], metrics[10])
+    }
 }
