@@ -28,35 +28,19 @@ const (
 
     // cgroup_path = "/sys/fs/cgroups/" could be replaced by below
     // To avoid mixing host's data to container(grabber)'s data, we will mount host data to /tmp
-    pid_cgroup = "/tmp/proc/{pid}/cgroup" //comes out the full path of CPU and RAM
+    pid_cgroup_path = "/tmp/proc/{pid}/cgroup" //comes out the full path of CPU and RAM
     net_metrics_path = "/tmp/proc/{pid}/net/dev"
     iterates = 10
 )
 
-func findEth0Index(data string) int {
-//    data_list = strings.Split(data, "\n")
-    for i, d := range strings.Split(data, "\n") {
-        if strings.Contains(d, "eth0") {
-            return i
-        }
-    }
-    return -1
+type Grabber struct {
+    // The process ID of the container
+    pid string
+    // The postfix name of output file
+    out string
+    // The grabbing frequency in millisecond
+    ms int
 }
-
-func scrapeNetMetrics(interval int, metrics_path string) []string {
-
-    var outputs []string
-    for i := 0; i < iterates; i++ {
-        net_stat, err := ioutil.ReadFile(metrics_path)
-
-        if err != nil {
-            log.Fatal(err)
-        }
-        outputs[i] = string(net_stat)
-    }
-    return outputs
-}
-
 
 func getCgroupMetricPath(cgroup_path string, keyword string) string {
 
@@ -75,9 +59,9 @@ func getCgroupMetricPath(cgroup_path string, keyword string) string {
 
 }
 
-func getCpuData(pid string, ms int, out string) {
+func (g Grabber) getCpuData() {
 
-    path := getCgroupMetricPath(strings.Replace(pid_cgroup, "{pid}", pid, 1), "cpu")
+    path := getCgroupMetricPath(strings.Replace(pid_cgroup_path, "{pid}", g.pid, 1), "cpu")
 
     if path == "" {
         log.Fatal("Error: failed to find the path of CPU data\n")
@@ -87,15 +71,51 @@ func getCpuData(pid string, ms int, out string) {
     for i:=0; i<iterates; i++ {
         v, err  := ioutil.ReadFile(path)
         if err != nil {
-            //fmt.Printf("Error: %v\n", err)
-            //return
             log.Fatal(err)
         }
         outputs[i] = strings.TrimSpace(string(v))
-        time.Sleep(time.Duration(ms) * time.Millisecond)
+        time.Sleep(time.Duration(g.ms) * time.Millisecond)
     }
 
     return
+}
+
+func findEth0Index(data string) int {
+//    data_list = strings.Split(data, "\n")
+    for i, d := range strings.Split(data, "\n") {
+        if strings.Contains(d, "eth0") {
+            return i
+        }
+    }
+    return -1
+}
+
+func (g Grabber) getNetworkData() {
+
+    var outputs [iterates]string
+    path := strings.Replace(net_metrics_path, "{pid}", g.pid, 1)
+
+    for i := 0; i < iterates; i++ {
+        net_stat, err := ioutil.ReadFile(path)
+
+        if err != nil {
+            log.Fatal(err)
+        }
+        outputs[i] = string(net_stat)
+        time.Sleep(time.Duration(g.ms) * time.Millisecond)
+    }
+
+    eth0_idx := findEth0Index(outputs[0])
+
+    if eth0_idx < 0 {
+        log.Print("No eth0's info.")
+        return
+    }
+
+    for i := 0; i < iterates; i++ {
+        metrics := strings.Fields(strings.Split(outputs[i],"\n")[eth0_idx])
+        fmt.Printf("%s %s %s %s \n", metrics[1], metrics[2], metrics[9], metrics[10])
+    }
 }
 
 
@@ -104,7 +124,6 @@ func main () {
     var metric_type string
     var pid, output_name string
     var interval_ms int
-
 
 
     flag.StringVar(&metric_type, "mtype", "cpu", "What metric to get: cpu/ram/net. (default: cpu)")
@@ -117,36 +136,21 @@ func main () {
         log.Print("Monitoring process cannot be processed with interval_ms less and equal 0.")
         return
     }
+
+    grabber := Grabber{pid, output_name, interval_ms}
     //getting numbers by type
     switch metric_type {
         case "cpu" :
             log.Print("Starting to get CPU data")
-            getCpuData(pid, interval_ms, output_name)
+            grabber.getCpuData()
         case "ram" :
             log.Print("Starting to get RAM data")
         case "net" :
             log.Print("Starting to get network data")
+            grabber.getNetworkData()
         default:
             log.Fatal("metric_type is not in the handling list")
     }
     //output numbers by type
 
-
-    for i:=0; i < 10; i++ {
-        fmt.Printf("get data %d from %s\n", i, pid)
-        time.Sleep(time.Duration(interval_ms) * time.Millisecond)
-    }
-
-    outputs := scrapeNetMetrics(interval_ms, "/tmp/proc/"+pid+"/net/dev")
-    eth0_idx := findEth0Index(outputs[0])
-
-    if eth0_idx < 0 {
-        log.Print("No eth0's info.")
-        return
-    }
-
-    for i := 0; i < iterates; i++ {
-        metrics := strings.Fields(strings.Split(outputs[i],"\n")[eth0_idx])
-        fmt.Printf("%s %s %s %s \n", metrics[1], metrics[2], metrics[9], metrics[10])
-    }
 }
