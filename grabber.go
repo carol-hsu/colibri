@@ -20,10 +20,8 @@ import (
     "flag"
     "fmt"
     "log"
-    "os"
     "io/ioutil"
     "strings"
-    "strconv"
 )
 
 const (
@@ -35,6 +33,9 @@ const (
     sys_fs_path = "/tmp/sys/fs/cgroup/"
     output_path = "/output/"
     iterates = 10
+
+    cpu_dir = "cpu,cpuacct"
+    mem_dir = "memory"
 )
 
 type Grabber struct {
@@ -46,26 +47,8 @@ type Grabber struct {
     ms int
 }
 
-func getCgroupMetricPath(cgroup_path string, keyword string) string {
-
-    file_content, err := ioutil.ReadFile(cgroup_path)
-
-    if err != nil {
-        fmt.Printf("Error: %v\n", err)
-    } else {
-        for _, path := range strings.Split(string(file_content), "\n") {
-            if strings.Contains(path, keyword) {
-                return strings.Split(path, ":")[2]
-            }
-        }
-    }
-    return ""
-
-}
-
 func (g Grabber) getCpuData() {
 
-    cpu_dir := "cpu,cpuacct"
     container_path := getCgroupMetricPath(strings.Replace(pid_cgroup_path, "{pid}", g.pid, 1), cpu_dir)
 
     if container_path == "" {
@@ -84,11 +67,7 @@ func (g Grabber) getCpuData() {
         time.Sleep(time.Duration(g.ms) * time.Millisecond)
     }
 
-    f, err := os.Create(output_path + g.out + "_" +fmt.Sprint(g.ms) + "ms_cpu")
-    if err != nil {
-        log.Fatal(err)
-    }
-
+    f := createOutputFile(output_path + g.out + "_" +fmt.Sprint(g.ms) + "ms_cpu")
     defer f.Close()
 
     for i:=0; i<iterates; i++ {
@@ -96,8 +75,7 @@ func (g Grabber) getCpuData() {
         total_cpu_time := 0
         // add the per cpu seconds
         for _, proc_num := range proc_nums {
-            n, _ := strconv.Atoi(proc_num)
-            total_cpu_time += n
+            total_cpu_time += stringToInt(proc_num)
         }
 
         f.WriteString(fmt.Sprint(total_cpu_time)+"\n")
@@ -106,14 +84,48 @@ func (g Grabber) getCpuData() {
     return
 }
 
-func findEth0Index(data string) int {
-//    data_list = strings.Split(data, "\n")
-    for i, d := range strings.Split(data, "\n") {
-        if strings.Contains(d, "eth0") {
-            return i
-        }
+func (g Grabber) getMemoryData() {
+
+    container_path := getCgroupMetricPath(strings.Replace(pid_cgroup_path, "{pid}", g.pid, 1), mem_dir)
+
+    if container_path == "" {
+        log.Fatal("Error: failed to find the path of Memory data\n")
     }
-    return -1
+
+    usage_file := sys_fs_path + mem_dir + container_path + "/memory.usage_in_bytes"
+    stats_file := sys_fs_path + mem_dir + container_path + "/memory.stat"
+
+    var usage_outputs [iterates]string
+    var stats_outputs [iterates]string
+
+    for i:=0; i<iterates; i++ {
+
+        usage, err  := ioutil.ReadFile(usage_file)
+        if err != nil {
+            log.Fatal(err)
+        }
+        usage_outputs[i] = strings.TrimSpace(string(usage))
+
+        stats, err  := ioutil.ReadFile(stats_file)
+        if err != nil {
+            log.Fatal(err)
+        }
+        stats_outputs[i] = string(stats)
+
+        time.Sleep(time.Duration(g.ms) * time.Millisecond)
+    }
+
+    f := createOutputFile(output_path + g.out + "_" +fmt.Sprint(g.ms) + "ms_mem")
+    defer f.Close()
+
+    inactive_file_idx := findIndex(stats_outputs[0], "total_inactive_file")
+
+    for i:=0; i<iterates; i++ {
+        v := stringToInt(usage_outputs[i]) - stringToInt(strings.Fields(strings.Split(stats_outputs[i], "\n")[inactive_file_idx])[1])
+        f.WriteString(fmt.Sprint(v)+"\n")
+    }
+
+    return
 }
 
 func (g Grabber) getNetworkData() {
@@ -131,17 +143,32 @@ func (g Grabber) getNetworkData() {
         time.Sleep(time.Duration(g.ms) * time.Millisecond)
     }
 
-    eth0_idx := findEth0Index(outputs[0])
+    eth0_idx := findIndex(outputs[0], "eth0")
 
     if eth0_idx < 0 {
         log.Print("No eth0's info.")
         return
     }
 
+    recv_bytes_file := createOutputFile(output_path + g.out + "_" +fmt.Sprint(g.ms) + "ms_recv_bytes")
+    recv_pkt_file := createOutputFile(output_path + g.out + "_" +fmt.Sprint(g.ms) + "ms_recv_pkt")
+    send_bytes_file := createOutputFile(output_path + g.out + "_" +fmt.Sprint(g.ms) + "ms_send_bytes")
+    send_pkt_file := createOutputFile(output_path + g.out + "_" +fmt.Sprint(g.ms) + "ms_send_pkt")
+
+    defer recv_bytes_file.Close()
+    defer recv_pkt_file.Close()
+    defer send_bytes_file.Close()
+    defer send_pkt_file.Close()
+
+    // create output files
     for i := 0; i < iterates; i++ {
         metrics := strings.Fields(strings.Split(outputs[i], "\n")[eth0_idx])
-        fmt.Printf("%s %s %s %s \n", metrics[1], metrics[2], metrics[9], metrics[10])
+        recv_bytes_file.WriteString(metrics[1]+"\n")
+        recv_pkt_file.WriteString(metrics[2]+"\n")
+        send_bytes_file.WriteString(metrics[9]+"\n")
+        send_pkt_file.WriteString(metrics[10]+"\n")
     }
+    return
 }
 
 
@@ -152,7 +179,7 @@ func main () {
     var interval_ms int
 
 
-    flag.StringVar(&metric_type, "mtype", "cpu", "What metric to get: cpu/ram/net. (default: cpu)")
+    flag.StringVar(&metric_type, "mtype", "cpu", "What metric to get: cpu/mem/net. (default: cpu)")
     flag.StringVar(&pid, "pid", "0", "The process ID of the container")
     flag.IntVar(&interval_ms, "freq", 5, "The scraping time of metrics collection in millisecond. (default: 5)")
     flag.StringVar(&output_name, "out", "test", "Output name of the metrics")
@@ -169,14 +196,14 @@ func main () {
         case "cpu" :
             log.Print("Starting to get CPU data")
             grabber.getCpuData()
-        case "ram" :
+        case "mem" :
             log.Print("Starting to get RAM data")
+            grabber.getMemoryData()
         case "net" :
             log.Print("Starting to get network data")
             grabber.getNetworkData()
         default:
             log.Fatal("metric_type is not in the handling list")
     }
-    //output numbers by type
 
 }
