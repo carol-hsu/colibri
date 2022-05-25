@@ -20,8 +20,10 @@ import (
     "flag"
     "fmt"
     "log"
+    "os"
     "io/ioutil"
     "strings"
+    "strconv"
 )
 
 const (
@@ -30,6 +32,8 @@ const (
     // To avoid mixing host's data to container(grabber)'s data, we will mount host data to /tmp
     pid_cgroup_path = "/tmp/proc/{pid}/cgroup" //comes out the full path of CPU and RAM
     net_metrics_path = "/tmp/proc/{pid}/net/dev"
+    sys_fs_path = "/tmp/sys/fs/cgroup/"
+    output_path = "/output/"
     iterates = 10
 )
 
@@ -61,20 +65,42 @@ func getCgroupMetricPath(cgroup_path string, keyword string) string {
 
 func (g Grabber) getCpuData() {
 
-    path := getCgroupMetricPath(strings.Replace(pid_cgroup_path, "{pid}", g.pid, 1), "cpu")
+    cpu_dir := "cpu,cpuacct"
+    container_path := getCgroupMetricPath(strings.Replace(pid_cgroup_path, "{pid}", g.pid, 1), cpu_dir)
 
-    if path == "" {
+    if container_path == "" {
         log.Fatal("Error: failed to find the path of CPU data\n")
     }
 
+    cpu_data_fullpath := sys_fs_path + cpu_dir + container_path + "/cpuacct.usage_percpu"
+
     var outputs [iterates]string
     for i:=0; i<iterates; i++ {
-        v, err  := ioutil.ReadFile(path)
+        v, err  := ioutil.ReadFile(cpu_data_fullpath)
         if err != nil {
             log.Fatal(err)
         }
         outputs[i] = strings.TrimSpace(string(v))
         time.Sleep(time.Duration(g.ms) * time.Millisecond)
+    }
+
+    f, err := os.Create(output_path + g.out + "_" +fmt.Sprint(g.ms) + "ms_cpu")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    defer f.Close()
+
+    for i:=0; i<iterates; i++ {
+        proc_nums := strings.Fields(outputs[i])
+        total_cpu_time := 0
+        // add the per cpu seconds
+        for _, proc_num := range proc_nums {
+            n, _ := strconv.Atoi(proc_num)
+            total_cpu_time += n
+        }
+
+        f.WriteString(fmt.Sprint(total_cpu_time)+"\n")
     }
 
     return
@@ -113,7 +139,7 @@ func (g Grabber) getNetworkData() {
     }
 
     for i := 0; i < iterates; i++ {
-        metrics := strings.Fields(strings.Split(outputs[i],"\n")[eth0_idx])
+        metrics := strings.Fields(strings.Split(outputs[i], "\n")[eth0_idx])
         fmt.Printf("%s %s %s %s \n", metrics[1], metrics[2], metrics[9], metrics[10])
     }
 }
