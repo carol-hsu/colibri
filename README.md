@@ -16,14 +16,39 @@ myaccount    22950  0.0  0.0  14428  1024 pts/0    S+   17:30   0:00 grep --colo
 
 Then, we can get the process id `9189` is for the container.
 
-## Build docker image
+## Build the image
 
-## Run container
+## Run metrics grabber container
 
-After building the image, run this job-like container 
+After building the image, to run this job-like container, please refer to following key points:
+
+### Parameters
+
+There are four dynamic input parameters as following:
+
+- `pid`: The process id of the container, must specifying the correct one so to get the metrics you want.
+- `mtype`: The types of metric for collection, `cpu`, `mem` or `net`, by default is `cpu`.
+- `freq`: The frequency of getting numbers. The unit is millisecond. By default is `5`. 
+- `out`: The prefix of output files. By default is `test`. So there will come out files named `test_*`
 
 ### Mounting points
 
-- `/proc`
-- `/sys`
-- output file directory
+The virual file system of cgroups are the significant service in Linux Kernel, to avoid violating the container environment, we prevent to overwrite the them on container.
+While the mounting points on container is hardcoded in the program, be awared to mount following directory to the exact pathes (on container).
+
+- `/proc` to `/tmp/proc`
+- `/sys/fs/cgroup` to `/tmp/cgroup`
+- output file directory to `/output/`
+
+### The example command
+
+Based on previous sections, you can run metrics grabber with the carefully configured command.
+
+```
+$ docker run -v /proc:/test/proc -v /sys/fs/cgroup:/tmp/cgroup -v /my-grabber/log/:/output fined-grabber:latest metrics-grabber --pid 1234 --mtype net --freq 10 --out yoman 
+```
+
+### Running with Kubernetes
+
+We can also run our metrics grabber through K8s, for getting the metrics on specific workers.
+Please check the directory `./k8s` for the configuration files and the script.

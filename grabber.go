@@ -30,9 +30,9 @@ const (
     // To avoid mixing host's data to container(grabber)'s data, we will mount host data to /tmp
     pid_cgroup_path = "/tmp/proc/{pid}/cgroup" //comes out the full path of CPU and RAM
     net_metrics_path = "/tmp/proc/{pid}/net/dev"
-    sys_fs_path = "/tmp/sys/fs/cgroup/"
+    sys_fs_path = "/tmp/cgroup/"
     output_path = "/output/"
-    iterates = 10
+    iterates = 24000
 
     cpu_dir = "cpu,cpuacct"
     mem_dir = "memory"
