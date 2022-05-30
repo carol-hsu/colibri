@@ -1,0 +1,75 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: grabber
+spec:
+  template:
+    spec:
+      nodeName: basalt
+      restartPolicy: Never
+      volumes:
+      - name: proc-dir
+        hostPath:
+          path: /proc
+          type: Directory
+      - name: cgroup-dir
+        hostPath:
+          path: /sys/fs/cgroup
+          type: Directory
+      - name: output
+        hostPath:
+          path: /mnt/output
+          type: Directory
+      containers:
+      - name: cpu-grabber
+        image: grabber:latest
+        imagePullPolicy: Never
+        command: ["metrics-grabber", "--pid", "$(PID)", "--out", "$(OUTPUT)"]
+        env:
+        - name: PID
+          value: "1234"
+        - name: OUTPUT
+          value: app
+        volumeMounts:
+        - mountPath: /tmp/proc
+          name: proc-dir
+        - mountPath: /tmp/cgroup
+          name: cgroup-dir
+        - mountPath: /output
+          name: output
+      - name: mem-grabber
+        image: grabber:latest
+        imagePullPolicy: Never
+        command: ["metrics-grabber", "--pid", "$(PID)", "--out", "$(OUTPUT)", "--mtype", "mem"]
+        env:
+        - name: PID
+          value: "1234"
+        - name: OUTPUT
+          value: app
+        volumeMounts:
+        - mountPath: /tmp/proc
+          name: proc-dir
+        - mountPath: /tmp/cgroup
+          name: cgroup-dir
+        - mountPath: /output
+          name: output
+      - name: net-grabber
+        image: grabber:latest
+        imagePullPolicy: Never
+        command: ["metrics-grabber", "--pid", "$(PID)", "--out", "$(OUTPUT)", "--mtype", "net"]
+        env:
+        - name: PID
+          value: "1234"
+        - name: OUTPUT
+          value: app
+        volumeMounts:
+        - mountPath: /tmp/proc
+          name: proc-dir
+        - mountPath: /tmp/cgroup
+          name: cgroup-dir
+        - mountPath: /output
+          name: output
+#        resources:
+#          requests:
+#            memory: "200Mi"
+#            cpu: "100m"

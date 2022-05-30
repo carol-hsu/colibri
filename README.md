@@ -51,4 +51,4 @@ $ docker run -v /proc:/test/proc -v /sys/fs/cgroup:/tmp/cgroup -v /my-grabber/lo
 ### Running with Kubernetes
 
 We can also run our metrics grabber through K8s, for getting the metrics on specific workers.
-Please check the directory `./k8s` for the configuration files and the script.
+Please refer to the file `grabber.yml`.
