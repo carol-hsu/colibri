@@ -128,7 +128,7 @@ func (g Grabber) getMemoryData() {
     return
 }
 
-func (g Grabber) getNetworkData() {
+func (g Grabber) getNetworkData(iface string) {
 
     var outputs [iterates]string
     path := strings.Replace(net_metrics_path, "{pid}", g.pid, 1)
@@ -143,10 +143,10 @@ func (g Grabber) getNetworkData() {
         time.Sleep(time.Duration(g.ms) * time.Millisecond)
     }
 
-    eth0_idx := findIndex(outputs[0], "eth0")
+    eth0_idx := findIndex(outputs[0], iface)
 
     if eth0_idx < 0 {
-        log.Print("No eth0's info.")
+        log.Printf("No info for %s\n", iface)
         return
     }
 
@@ -175,7 +175,7 @@ func (g Grabber) getNetworkData() {
 func main () {
 
     var metric_type string
-    var pid, output_name string
+    var pid, output_name, net_iface string
     var interval_ms int
 
 
@@ -183,6 +183,7 @@ func main () {
     flag.StringVar(&pid, "pid", "0", "The process ID of the container")
     flag.IntVar(&interval_ms, "freq", 5, "The scraping time of metrics collection in millisecond. (default: 5)")
     flag.StringVar(&output_name, "out", "test", "Output name of the metrics")
+    flag.StringVar(&net_iface, "iface", "eth0", "The name of network interface of the container. Only used for grabbing network metrics. (default: eth0)")
     flag.Parse()
 
     if interval_ms <= 0 {
@@ -201,7 +202,7 @@ func main () {
             grabber.getMemoryData()
         case "net" :
             log.Print("Starting to get network data")
-            grabber.getNetworkData()
+            grabber.getNetworkData(net_iface)
         default:
             log.Fatal("metric_type is not in the handling list")
     }

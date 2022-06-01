@@ -30,6 +30,7 @@ There are four dynamic input parameters as following:
 - `mtype`: The types of metric for collection, `cpu`, `mem` or `net`, by default is `cpu`.
 - `freq`: The frequency of getting numbers. The unit is millisecond. By default is `5`. 
 - `out`: The prefix of output files. By default is `test`. So there will come out files named `test_*`
+- `iface`: The network interface of the container which you want to get metrics. Only used when `mtype = net`. By default is `eth0`.
 
 ### Mounting points
 
