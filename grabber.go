@@ -55,7 +55,7 @@ func (g Grabber) getCpuData() {
         log.Fatal("Error: failed to find the path of CPU data\n")
     }
 
-    cpu_data_fullpath := sys_fs_path + cpu_dir + container_path + "/cpuacct.usage_percpu"
+    cpu_data_fullpath := sys_fs_path + cpu_dir + container_path + "/cpuacct.usage"
 
     var outputs [iterates]string
     for i:=0; i<iterates; i++ {
@@ -71,14 +71,7 @@ func (g Grabber) getCpuData() {
     defer f.Close()
 
     for i:=0; i<iterates; i++ {
-        proc_nums := strings.Fields(outputs[i])
-        total_cpu_time := 0
-        // add the per cpu seconds
-        for _, proc_num := range proc_nums {
-            total_cpu_time += stringToInt(proc_num)
-        }
-
-        f.WriteString(fmt.Sprint(total_cpu_time)+"\n")
+        f.WriteString(outputs[i]+"\n")
     }
 
     return
