@@ -5,7 +5,7 @@ metadata:
 spec:
   template:
     spec:
-      nodeName: basalt
+      nodeName: HOSTNAME
       restartPolicy: Never
       volumes:
       - name: proc-dir
@@ -69,7 +69,3 @@ spec:
           name: cgroup-dir
         - mountPath: /output
           name: output
-#        resources:
-#          requests:
-#            memory: "200Mi"
-#            cpu: "100m"

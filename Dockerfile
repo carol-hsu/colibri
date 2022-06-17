@@ -21,10 +21,6 @@ ENV GOARCH=amd64
 
 # build
 WORKDIR /go/src/metrics-grabber/
-#COPY go.mod .
-#COPY go.sum .
-#RUN GO111MODULE=on go mod download
-#COPY . .
 COPY . .
 RUN GO111MODULE=on go mod download
 RUN go install -ldflags "-s -w -X main.version=$VERSION" metrics-grabber

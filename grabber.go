@@ -32,7 +32,6 @@ const (
     net_metrics_path = "/tmp/proc/{pid}/net/dev"
     sys_fs_path = "/tmp/cgroup/"
     output_path = "/output/"
-    iterates = 24000
 
     cpu_dir = "cpu,cpuacct"
     mem_dir = "memory"
@@ -45,6 +44,8 @@ type Grabber struct {
     out string
     // The grabbing frequency in millisecond
     ms int
+    // The grabbing iterates
+    iter int
 }
 
 func (g Grabber) getCpuData() {
@@ -57,8 +58,9 @@ func (g Grabber) getCpuData() {
 
     cpu_data_fullpath := sys_fs_path + cpu_dir + container_path + "/cpuacct.usage"
 
-    var outputs [iterates]string
-    for i:=0; i<iterates; i++ {
+    var outputs = make([]string, g.iter)
+
+    for i:=0; i<g.iter; i++ {
         v, err  := ioutil.ReadFile(cpu_data_fullpath)
         if err != nil {
             log.Fatal(err)
@@ -70,7 +72,7 @@ func (g Grabber) getCpuData() {
     f := createOutputFile(output_path + g.out + "_" +fmt.Sprint(g.ms) + "ms_cpu")
     defer f.Close()
 
-    for i:=0; i<iterates; i++ {
+    for i:=0; i<g.iter; i++ {
         f.WriteString(outputs[i]+"\n")
     }
 
@@ -88,10 +90,10 @@ func (g Grabber) getMemoryData() {
     usage_file := sys_fs_path + mem_dir + container_path + "/memory.usage_in_bytes"
     stats_file := sys_fs_path + mem_dir + container_path + "/memory.stat"
 
-    var usage_outputs [iterates]string
-    var stats_outputs [iterates]string
+    var usage_outputs = make([]string, g.iter)
+    var stats_outputs = make([]string, g.iter)
 
-    for i:=0; i<iterates; i++ {
+    for i:=0; i < g.iter; i++ {
 
         usage, err  := ioutil.ReadFile(usage_file)
         if err != nil {
@@ -113,7 +115,7 @@ func (g Grabber) getMemoryData() {
 
     inactive_file_idx := findIndex(stats_outputs[0], "total_inactive_file")
 
-    for i:=0; i<iterates; i++ {
+    for i := 0; i < g.iter; i++ {
         v := stringToInt(usage_outputs[i]) - stringToInt(strings.Fields(strings.Split(stats_outputs[i], "\n")[inactive_file_idx])[1])
         f.WriteString(fmt.Sprint(v)+"\n")
     }
@@ -123,10 +125,10 @@ func (g Grabber) getMemoryData() {
 
 func (g Grabber) getNetworkData(iface string) {
 
-    var outputs [iterates]string
+    var outputs = make([]string, g.iter)
     path := strings.Replace(net_metrics_path, "{pid}", g.pid, 1)
 
-    for i := 0; i < iterates; i++ {
+    for i := 0; i < g.iter; i++ {
         net_stat, err := ioutil.ReadFile(path)
 
         if err != nil {
@@ -154,7 +156,7 @@ func (g Grabber) getNetworkData(iface string) {
     defer send_pkt_file.Close()
 
     // create output files
-    for i := 0; i < iterates; i++ {
+    for i := 0; i < g.iter; i++ {
         metrics := strings.Fields(strings.Split(outputs[i], "\n")[eth0_idx])
         recv_bytes_file.WriteString(metrics[1]+"\n")
         recv_pkt_file.WriteString(metrics[2]+"\n")
@@ -169,12 +171,13 @@ func main () {
 
     var metric_type string
     var pid, output_name, net_iface string
-    var interval_ms int
+    var interval_ms, iterate_num int
 
 
     flag.StringVar(&metric_type, "mtype", "cpu", "What metric to get: cpu/mem/net. (default: cpu)")
     flag.StringVar(&pid, "pid", "0", "The process ID of the container")
-    flag.IntVar(&interval_ms, "freq", 5, "The scraping time of metrics collection in millisecond. (default: 5)")
+    flag.IntVar(&interval_ms, "freq", 5, "The scraping interval in millisecond. (default: 5)")
+    flag.IntVar(&iterate_num, "iter", 24000, "The scraping numbers. (default: 24000)")
     flag.StringVar(&output_name, "out", "test", "Output name of the metrics")
     flag.StringVar(&net_iface, "iface", "eth0", "The name of network interface of the container. Only used for grabbing network metrics. (default: eth0)")
     flag.Parse()
@@ -184,7 +187,7 @@ func main () {
         return
     }
 
-    grabber := Grabber{pid, output_name, interval_ms}
+    grabber := Grabber{pid, output_name, interval_ms, iterate_num}
     //getting numbers by type
     switch metric_type {
         case "cpu" :
