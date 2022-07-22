@@ -22,7 +22,10 @@ import (
     "io/ioutil"
     "strings"
     "strconv"
+    "github.com/montanaflynn/stats"
 )
+
+const percent = 95
 
 func stringToInt(str string) int {
     n, _ := strconv.Atoi(str)
@@ -65,4 +68,27 @@ func createOutputFile(filename string) *os.File {
     }
 
     return f
+}
+
+func countRate(data []string, interval int) []float64 {
+
+    res := make([]float64, 2)
+    float_data := make([]float64, len(data)-1)
+
+    for i := 0; i < len(data)-1; i++ {
+        float_data[i] = float64((stringToInt(data[i+1]) - stringToInt(data[i])) / interval)
+    }
+
+    res[0], _ = stats.Mean(float_data)
+    res[1], _ = stats.Percentile(float_data, 95)
+
+    return res
+}
+
+func countValue(data []float64) []float64 {
+
+    res := make([]float64, 2)
+    res[0], _ = stats.Mean(data)
+    res[1], _ = stats.Percentile(data, 95)
+    return res
 }

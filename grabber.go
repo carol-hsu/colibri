@@ -48,7 +48,7 @@ type Grabber struct {
     iter int
 }
 
-func (g Grabber) getCpuData() {
+func (g Grabber) getCpuData(c chan []float64) {
 
     container_path := getCgroupMetricPath(strings.Replace(pid_cgroup_path, "{pid}", g.pid, 1), cpu_dir)
 
@@ -69,17 +69,29 @@ func (g Grabber) getCpuData() {
         time.Sleep(time.Duration(g.ms) * time.Millisecond)
     }
 
-    f := createOutputFile(output_path + g.out + "_" +fmt.Sprint(g.ms) + "ms_cpu")
-    defer f.Close()
+    //if output_name == none, then don't write out, just print analysis result
+    if g.out != "none" {
+        f := createOutputFile(output_path + g.out + "_" +fmt.Sprint(g.ms) + "ms_cpu")
+        defer f.Close()
 
-    for i:=0; i<g.iter; i++ {
-        f.WriteString(outputs[i]+"\n")
+        for i:=0; i<g.iter; i++ {
+            f.WriteString(outputs[i]+"\n")
+        }
+    }
+
+    res := countRate(outputs, g.ms)
+
+    if c != nil{
+        //sending for done
+        c <- res
+    }else{
+        log.Printf("Avg: %f, 95-Percentile: %f\n", res[0], res[1])
     }
 
     return
 }
 
-func (g Grabber) getMemoryData() {
+func (g Grabber) getMemoryData(c chan []float64) {
 
     container_path := getCgroupMetricPath(strings.Replace(pid_cgroup_path, "{pid}", g.pid, 1), mem_dir)
 
@@ -90,8 +102,8 @@ func (g Grabber) getMemoryData() {
     usage_file := sys_fs_path + mem_dir + container_path + "/memory.usage_in_bytes"
     stats_file := sys_fs_path + mem_dir + container_path + "/memory.stat"
 
-    var usage_outputs = make([]string, g.iter)
-    var stats_outputs = make([]string, g.iter)
+    var usage_outputs, stats_outputs = make([]string, g.iter), make([]string, g.iter)
+    //var stats_outputs = make([]string, g.iter)
 
     for i:=0; i < g.iter; i++ {
 
@@ -110,20 +122,39 @@ func (g Grabber) getMemoryData() {
         time.Sleep(time.Duration(g.ms) * time.Millisecond)
     }
 
-    f := createOutputFile(output_path + g.out + "_" +fmt.Sprint(g.ms) + "ms_mem")
-    defer f.Close()
+    //count usage and inactive file size, and stored in float
+    var outputs = make([]float64, g.iter)
 
     inactive_file_idx := findIndex(stats_outputs[0], "total_inactive_file")
 
     for i := 0; i < g.iter; i++ {
         v := stringToInt(usage_outputs[i]) - stringToInt(strings.Fields(strings.Split(stats_outputs[i], "\n")[inactive_file_idx])[1])
-        f.WriteString(fmt.Sprint(v)+"\n")
+        outputs[i] = float64(v)
     }
 
+    //if output_name == none, then don't write out, just print analysis result
+    if g.out != "none" {
+        f := createOutputFile(output_path + g.out + "_" +fmt.Sprint(g.ms) + "ms_mem")
+        defer f.Close()
+
+
+        for i := 0; i < g.iter; i++ {
+            f.WriteString(fmt.Sprintf("%f\n", outputs[i]))
+        }
+    }
+
+    res := countValue(outputs)
+    if c != nil{
+        //sending for done
+        c <- res
+    }else{
+        // print result
+        log.Printf("Avg: %f, 95-Percentile: %f\n", res[0], res[1])
+    }
     return
 }
 
-func (g Grabber) getNetworkData(iface string) {
+func (g Grabber) getNetworkData(iface string, c chan []float64) {
 
     var outputs = make([]string, g.iter)
     path := strings.Replace(net_metrics_path, "{pid}", g.pid, 1)
@@ -145,27 +176,45 @@ func (g Grabber) getNetworkData(iface string) {
         return
     }
 
-    recv_bytes_file := createOutputFile(output_path + g.out + "_" +fmt.Sprint(g.ms) + "ms_recv_bytes")
-    recv_pkt_file := createOutputFile(output_path + g.out + "_" +fmt.Sprint(g.ms) + "ms_recv_pkt")
-    send_bytes_file := createOutputFile(output_path + g.out + "_" +fmt.Sprint(g.ms) + "ms_send_bytes")
-    send_pkt_file := createOutputFile(output_path + g.out + "_" +fmt.Sprint(g.ms) + "ms_send_pkt")
+    //parse bandwidth value, and store separately
+    var ig_bw = make([]string, g.iter)
+    var eg_bw = make([]string, g.iter)
 
-    defer recv_bytes_file.Close()
-    defer recv_pkt_file.Close()
-    defer send_bytes_file.Close()
-    defer send_pkt_file.Close()
-
-    // create output files
     for i := 0; i < g.iter; i++ {
         metrics := strings.Fields(strings.Split(outputs[i], "\n")[eth0_idx])
-        recv_bytes_file.WriteString(metrics[1]+"\n")
-        recv_pkt_file.WriteString(metrics[2]+"\n")
-        send_bytes_file.WriteString(metrics[9]+"\n")
-        send_pkt_file.WriteString(metrics[10]+"\n")
+        ig_bw[i] = metrics[1]
+        eg_bw[i] = metrics[9]
     }
+
+    //if output_name == none, then don't write out, just print analysis result
+    if g.out != "none" {
+        ig_file := createOutputFile(output_path + g.out + "_" +fmt.Sprint(g.ms) + "ms_ig_bytes")
+        eg_file := createOutputFile(output_path + g.out + "_" +fmt.Sprint(g.ms) + "ms_eg_bytes")
+
+        defer ig_file.Close()
+        defer eg_file.Close()
+
+        // create output files
+        for i := 0; i < g.iter; i++ {
+            ig_file.WriteString(ig_bw[i]+"\n")
+            eg_file.WriteString(eg_bw[i]+"\n")
+        }
+    }
+
+    ig_res := countRate(ig_bw, g.ms)
+    eg_res := countRate(eg_bw, g.ms)
+
+    if c != nil{
+        c <- []float64{ig_res[0], ig_res[1], eg_res[0], eg_res[1]}
+        return
+    }else {
+        // print result
+        log.Printf("Ingress Avg: %f, 95-Percentile: %f\n", ig_res[0], ig_res[1])
+        log.Printf("Egress Avg: %f, 95-Percentile: %f\n", eg_res[0], eg_res[1])
+    }
+
     return
 }
-
 
 func main () {
 
@@ -178,7 +227,7 @@ func main () {
     flag.StringVar(&pid, "pid", "0", "The process ID of the container")
     flag.IntVar(&interval_ms, "freq", 5, "The scraping interval in millisecond. (default: 5)")
     flag.IntVar(&iterate_num, "iter", 24000, "The scraping numbers. (default: 24000)")
-    flag.StringVar(&output_name, "out", "test", "Output name of the metrics")
+    flag.StringVar(&output_name, "output", "none", "Output name of the metrics")
     flag.StringVar(&net_iface, "iface", "eth0", "The name of network interface of the container. Only used for grabbing network metrics. (default: eth0)")
     flag.Parse()
 
@@ -186,19 +235,34 @@ func main () {
         log.Print("Monitoring process cannot be processed with interval_ms less and equal 0.")
         return
     }
-
     grabber := Grabber{pid, output_name, interval_ms, iterate_num}
+
     //getting numbers by type
     switch metric_type {
         case "cpu" :
             log.Print("Starting to get CPU data")
-            grabber.getCpuData()
+            grabber.getCpuData(nil)
+
         case "mem" :
             log.Print("Starting to get RAM data")
-            grabber.getMemoryData()
+            grabber.getMemoryData(nil)
+
         case "net" :
             log.Print("Starting to get network data")
-            grabber.getNetworkData(net_iface)
+            grabber.getNetworkData(net_iface, nil)
+
+        case "all":
+            log.Print("Starting to get all metrics")
+            cpu_c, mem_c, net_c := make(chan []float64), make(chan []float64), make(chan []float64)
+            go grabber.getCpuData(cpu_c)
+            go grabber.getMemoryData(mem_c)
+            go grabber.getNetworkData(net_iface, net_c)
+            cpu_out, mem_out, net_out := <-cpu_c, <-mem_c, <-net_c
+            log.Printf("CPU Avg: %f, 95-Percentile: %f\n", cpu_out[0], cpu_out[1])
+            log.Printf("RAM Avg: %f, 95-Percentile: %f\n", mem_out[0], mem_out[1])
+            log.Printf("NET Ingress Avg: %f, 95-Percentile: %f\n", net_out[0], net_out[1])
+            log.Printf("NET Egress Avg: %f, 95-Percentile: %f\n", net_out[2], net_out[3])
+
         default:
             log.Fatal("metric_type is not in the handling list")
     }
