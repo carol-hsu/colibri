@@ -226,8 +226,8 @@ func main () {
     flag.StringVar(&metric_type, "mtype", "cpu", "What metric to get: cpu/mem/net. (default: cpu)")
     flag.StringVar(&pid, "pid", "0", "The process ID of the container")
     flag.IntVar(&interval_ms, "freq", 5, "The scraping interval in millisecond. (default: 5)")
-    flag.IntVar(&iterate_num, "iter", 24000, "The scraping numbers. (default: 24000)")
-    flag.StringVar(&output_name, "output", "none", "Output name of the metrics")
+    flag.IntVar(&iterate_num, "iter", 2000, "The scraping numbers. (default: 2000)")
+    flag.StringVar(&output_name, "out", "none", "Output name of the metrics")
     flag.StringVar(&net_iface, "iface", "eth0", "The name of network interface of the container. Only used for grabbing network metrics. (default: eth0)")
     flag.Parse()
 

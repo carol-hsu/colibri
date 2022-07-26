@@ -27,9 +27,11 @@ After building the image, to run this job-like container, please refer to follow
 There are four dynamic input parameters as following:
 
 - `pid`: The process id of the container, must specifying the correct one so to get the metrics you want.
-- `mtype`: The types of metric for collection, `cpu`, `mem` or `net`, by default is `cpu`.
+- `mtype`: The types of metric for collection, `cpu`, `mem`, `net` or `all`, `all` will run all three metric types. By default is `cpu`. 
 - `freq`: The frequency of getting numbers. The unit is millisecond. By default is `5`. 
-- `out`: The prefix of output files. By default is `test`. So there will come out files named `test_*`
+- `iter`: The iterations of getting numbers. By default is `2000`. 
+- `out`: The prefix of output files. By default it is `none`, there will be no output of raw metrics. If the value is assigned with `test`,
+there will come out files named `test_*`
 - `iface`: The network interface of the container which you want to get metrics. Only used when `mtype = net`. By default is `eth0`.
 
 ### Mounting points
@@ -46,7 +48,7 @@ While the mounting points on container is hardcoded in the program, be awared to
 Based on previous sections, you can run metrics grabber with the carefully configured command.
 
 ```
-$ docker run -v /proc:/test/proc -v /sys/fs/cgroup:/tmp/cgroup -v /my-grabber/log/:/output fined-grabber:latest metrics-grabber --pid 1234 --mtype net --freq 10 --out yoman 
+$ docker run -v /proc:/test/proc -v /sys/fs/cgroup:/tmp/cgroup -v /my-grabber/log/:/output fined-grabber:latest metrics-grabber --pid 1234 --mtype net --freq 10 --iter 24000 --out yoman 
 ```
 
 ### Running with Kubernetes
