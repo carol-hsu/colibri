@@ -19,6 +19,7 @@ import (
     "fmt"
     "log"
     "os"
+    "math"
     "io/ioutil"
     "strings"
     "strconv"
@@ -76,7 +77,7 @@ func countRate(data []string, interval int) []float64 {
     float_data := make([]float64, len(data)-1)
 
     for i := 0; i < len(data)-1; i++ {
-        float_data[i] = float64((stringToInt(data[i+1]) - stringToInt(data[i])) / interval / 1000000)
+        float_data[i] = float64((stringToInt(data[i+1]) - stringToInt(data[i])) / interval)
     }
 
     res[0], _ = stats.Mean(float_data)
@@ -91,4 +92,19 @@ func countValue(data []float64) []float64 {
     res[0], _ = stats.Mean(data)
     res[1], _ = stats.Percentile(data, 95)
     return res
+}
+
+func transBandwidthUnit(bw float64) string {
+    // change X/ms to Y/s, Y's minimum unit is k
+    // check if the value fit for k or M
+    if (bw*1000/1024) < 1 {
+    // less than 1 KB, return minimal one
+        return "1k"
+    }else if (bw*1000/1024/1024) < 1 {
+    // less than KB use "k"
+        return fmt.Sprint(math.Round(bw*1000/1024))+"k"
+    }else{
+    // larger than MB, use "M"
+        return fmt.Sprint(math.Round(bw*1000/1024/1024))+"M"
+    }
 }

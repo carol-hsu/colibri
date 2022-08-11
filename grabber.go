@@ -20,6 +20,7 @@ import (
     "flag"
     "fmt"
     "log"
+    "math"
     "io/ioutil"
     "strings"
 )
@@ -58,14 +59,20 @@ func (g Grabber) getCpuData(c chan []float64) {
 
     cpu_data_fullpath := sys_fs_path + cpu_dir + container_path + "/cpuacct.usage"
 
-    var outputs = make([]string, g.iter)
+    var outputs = []string{}
 
     for i:=0; i<g.iter; i++ {
         v, err  := ioutil.ReadFile(cpu_data_fullpath)
         if err != nil {
-            log.Fatal(err)
+            if i == 0 {
+            // nothing existed in output, then forcefully stop
+                log.Fatal(err)
+            }else{
+                log.Print("App stopped earlier, starting to print output")
+                break
+            }
         }
-        outputs[i] = strings.TrimSpace(string(v))
+        outputs = append(outputs, strings.TrimSpace(string(v)))
         time.Sleep(time.Duration(g.ms) * time.Millisecond)
     }
 
@@ -74,7 +81,7 @@ func (g Grabber) getCpuData(c chan []float64) {
         f := createOutputFile(output_path + g.out + "_" +fmt.Sprint(g.ms) + "ms_cpu")
         defer f.Close()
 
-        for i:=0; i<g.iter; i++ {
+        for i:=0; i<len(outputs); i++ {
             f.WriteString(outputs[i]+"\n")
         }
     }
@@ -85,7 +92,8 @@ func (g Grabber) getCpuData(c chan []float64) {
         //sending for done
         c <- res
     }else{
-        log.Printf("Avg: %f, 95-Percentile: %f\n", res[0], res[1])
+        log.Printf("CPU Avg: %d, 95-Percentile: %d\n", int(math.Round(res[0]/1000)),
+                                                       int(math.Round(res[1]/1000)))
     }
 
     return
@@ -102,32 +110,43 @@ func (g Grabber) getMemoryData(c chan []float64) {
     usage_file := sys_fs_path + mem_dir + container_path + "/memory.usage_in_bytes"
     stats_file := sys_fs_path + mem_dir + container_path + "/memory.stat"
 
-    var usage_outputs, stats_outputs = make([]string, g.iter), make([]string, g.iter)
-    //var stats_outputs = make([]string, g.iter)
+    var usage_outputs, stats_outputs = []string{}, []string{}
 
     for i:=0; i < g.iter; i++ {
 
         usage, err  := ioutil.ReadFile(usage_file)
         if err != nil {
-            log.Fatal(err)
+            if i == 0 {
+            // nothing existed in output, then forcefully stop
+                log.Fatal(err)
+            }else{
+                log.Print("App stopped earlier, starting to print output")
+                break
+            }
         }
-        usage_outputs[i] = strings.TrimSpace(string(usage))
+        usage_outputs = append(usage_outputs, strings.TrimSpace(string(usage)))
 
         stats, err  := ioutil.ReadFile(stats_file)
         if err != nil {
-            log.Fatal(err)
+            if i == 0 {
+            // nothing existed in output, then forcefully stop
+                log.Fatal(err)
+            }else{
+                log.Print("App stopped earlier, starting to print output")
+                break
+            }
         }
-        stats_outputs[i] = string(stats)
+        stats_outputs = append(stats_outputs, string(stats))
 
         time.Sleep(time.Duration(g.ms) * time.Millisecond)
     }
 
     //count usage and inactive file size, and stored in float
-    var outputs = make([]float64, g.iter)
+    var outputs = make([]float64, len(stats_outputs))
 
     inactive_file_idx := findIndex(stats_outputs[0], "total_inactive_file")
 
-    for i := 0; i < g.iter; i++ {
+    for i := 0; i < len(outputs); i++ {
         v := stringToInt(usage_outputs[i]) - stringToInt(strings.Fields(strings.Split(stats_outputs[i], "\n")[inactive_file_idx])[1])
         outputs[i] = float64(v)
     }
@@ -138,34 +157,42 @@ func (g Grabber) getMemoryData(c chan []float64) {
         defer f.Close()
 
 
-        for i := 0; i < g.iter; i++ {
+        for i := 0; i < len(outputs); i++ {
             f.WriteString(fmt.Sprintf("%f\n", outputs[i]))
         }
     }
 
     res := countValue(outputs)
+
     if c != nil{
         //sending for done
         c <- res
     }else{
         // print result
-        log.Printf("Avg: %f, 95-Percentile: %f\n", res[0], res[1])
+        log.Printf("RAM Avg: %d, 95-Percentile: %d\n", int(math.Round(res[0]/1024/1024)),
+                                                       int(math.Round(res[1]/1024/1024)))
     }
     return
 }
 
 func (g Grabber) getNetworkData(iface string, c chan []float64) {
 
-    var outputs = make([]string, g.iter)
+    var outputs =[]string{}
     path := strings.Replace(net_metrics_path, "{pid}", g.pid, 1)
 
     for i := 0; i < g.iter; i++ {
         net_stat, err := ioutil.ReadFile(path)
 
         if err != nil {
-            log.Fatal(err)
+            if i == 0 {
+            // nothing existed in output, then forcefully stop
+                log.Fatal(err)
+            }else{
+                log.Print("App stopped earlier, starting to print output")
+                break
+            }
         }
-        outputs[i] = string(net_stat)
+        outputs = append(outputs, string(net_stat))
         time.Sleep(time.Duration(g.ms) * time.Millisecond)
     }
 
@@ -177,10 +204,11 @@ func (g Grabber) getNetworkData(iface string, c chan []float64) {
     }
 
     //parse bandwidth value, and store separately
-    var ig_bw = make([]string, g.iter)
-    var eg_bw = make([]string, g.iter)
+    var output_len = len(outputs)
+    var ig_bw = make([]string, output_len)
+    var eg_bw = make([]string, output_len)
 
-    for i := 0; i < g.iter; i++ {
+    for i := 0; i < output_len; i++ {
         metrics := strings.Fields(strings.Split(outputs[i], "\n")[eth0_idx])
         ig_bw[i] = metrics[1]
         eg_bw[i] = metrics[9]
@@ -195,7 +223,7 @@ func (g Grabber) getNetworkData(iface string, c chan []float64) {
         defer eg_file.Close()
 
         // create output files
-        for i := 0; i < g.iter; i++ {
+        for i := 0; i < output_len; i++ {
             ig_file.WriteString(ig_bw[i]+"\n")
             eg_file.WriteString(eg_bw[i]+"\n")
         }
@@ -205,12 +233,14 @@ func (g Grabber) getNetworkData(iface string, c chan []float64) {
     eg_res := countRate(eg_bw, g.ms)
 
     if c != nil{
-        c <- []float64{ig_res[0], ig_res[1], eg_res[0], eg_res[1]}
+        c <- append(ig_res, eg_res...)
         return
     }else {
         // print result
-        log.Printf("Ingress Avg: %f, 95-Percentile: %f\n", ig_res[0], ig_res[1])
-        log.Printf("Egress Avg: %f, 95-Percentile: %f\n", eg_res[0], eg_res[1])
+        log.Printf("Ingress Avg: %s, 95-Percentile: %s\n", transBandwidthUnit(ig_res[0]),
+                                                           transBandwidthUnit(ig_res[1]))
+        log.Printf("Egress Avg: %s, 95-Percentile: %s\n", transBandwidthUnit(eg_res[0]),
+                                                          transBandwidthUnit(eg_res[1]))
     }
 
     return
@@ -258,10 +288,14 @@ func main () {
             go grabber.getMemoryData(mem_c)
             go grabber.getNetworkData(net_iface, net_c)
             cpu_out, mem_out, net_out := <-cpu_c, <-mem_c, <-net_c
-            log.Printf("CPU Avg: %f, 95-Percentile: %f\n", cpu_out[0], cpu_out[1])
-            log.Printf("RAM Avg: %f, 95-Percentile: %f\n", mem_out[0], mem_out[1])
-            log.Printf("NET Ingress Avg: %f, 95-Percentile: %f\n", net_out[0], net_out[1])
-            log.Printf("NET Egress Avg: %f, 95-Percentile: %f\n", net_out[2], net_out[3])
+            log.Printf("CPU Avg: %d, 95-Percentile: %d\n", int(math.Round(cpu_out[0]/1000)),
+                                                           int(math.Round(cpu_out[1]/1000)))
+            log.Printf("RAM Avg: %d, 95-Percentile: %d\n", int(math.Round(mem_out[0]/1024/1024)),
+                                                           int(math.Round(mem_out[1]/1024/1024)))
+            log.Printf("NET Ingress Avg: %s, 95-Percentile: %s\n", transBandwidthUnit(net_out[0]),
+                                                                   transBandwidthUnit(net_out[1]))
+            log.Printf("NET Egress Avg: %s, 95-Percentile: %s\n", transBandwidthUnit(net_out[2]),
+                                                                  transBandwidthUnit(net_out[3]))
 
         default:
             log.Fatal("metric_type is not in the handling list")
