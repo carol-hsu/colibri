@@ -76,6 +76,7 @@ func (g Grabber) getCpuData(c chan []float64) {
         time.Sleep(time.Duration(g.ms) * time.Millisecond)
     }
 
+    log.Print("CPU metrics collection is finished. Start to post-process data ...")
     //if output_name == none, then don't write out, just print analysis result
     if g.out != "none" {
         f := createOutputFile(output_path + g.out + "_" +fmt.Sprint(g.ms) + "ms_cpu")
@@ -141,6 +142,8 @@ func (g Grabber) getMemoryData(c chan []float64) {
         time.Sleep(time.Duration(g.ms) * time.Millisecond)
     }
 
+    log.Print("Memory metrics collection is finished. Start to post-process data ...")
+
     //count usage and inactive file size, and stored in float
     var outputs = make([]float64, len(stats_outputs))
 
@@ -195,6 +198,8 @@ func (g Grabber) getNetworkData(iface string, c chan []float64) {
         outputs = append(outputs, string(net_stat))
         time.Sleep(time.Duration(g.ms) * time.Millisecond)
     }
+
+    log.Print("Network metrics collection is finished. Start to post-process data ...")
 
     eth0_idx := findIndex(outputs[0], iface)
 
@@ -300,5 +305,7 @@ func main () {
         default:
             log.Fatal("metric_type is not in the handling list")
     }
+
+    log.Print("Colibri is successfully completed !")
 
 }
