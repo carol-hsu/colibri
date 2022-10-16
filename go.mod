@@ -1,4 +1,4 @@
-module metrics-grabber
+module colibri
 
 go 1.18
 

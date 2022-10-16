@@ -20,12 +20,12 @@ ENV GOOS=linux
 ENV GOARCH=amd64
 
 # build
-WORKDIR /go/src/metrics-grabber/
+WORKDIR /go/src/colibri/
 COPY . .
 RUN GO111MODULE=on go mod download
-RUN go install -ldflags "-s -w -X main.version=$VERSION" metrics-grabber
+RUN go install -ldflags "-s -w -X main.version=$VERSION" colibri
 
 # runtime image
 FROM gcr.io/google_containers/ubuntu-slim:0.14
-COPY --from=builder /go/bin/metrics-grabber /usr/bin/metrics-grabber
-CMD ["metrics-grabber"]
+COPY --from=builder /go/bin/colibri /usr/bin/colibri
+CMD ["colibri"]

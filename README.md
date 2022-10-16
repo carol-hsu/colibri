@@ -1,4 +1,4 @@
-# Finer-grained Metrics Grabber
+# Colibri: Fine-grained Metrics Gleaner
 
 This tool helps you to get the metrics of resource utilization of a specific container in finer-granularity, in millisecond scale.
 We do so by getting numbers from the statistics on kernel: through reading the virtual files in `/proc` and `/sys/fs/cgroup`.
