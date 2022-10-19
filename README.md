@@ -48,7 +48,7 @@ While the mounting points on container is hardcoded in the program, be awared to
 Based on previous sections, you can run metrics grabber with the carefully configured command.
 
 ```
-$ docker run -v /proc:/test/proc -v /sys/fs/cgroup:/tmp/cgroup -v /my-grabber/log/:/output fined-grabber:latest metrics-grabber --pid 1234 --mtype net --freq 10 --iter 24000 --out yoman 
+$ docker run -v /proc:/test/proc -v /sys/fs/cgroup:/tmp/cgroup -v /my-grabber/log/:/output colibri:latest colibri --pid 1234 --mtype net --freq 10 --iter 24000 --out yoman 
 ```
 
 ### Running with Kubernetes

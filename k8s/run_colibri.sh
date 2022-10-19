@@ -21,13 +21,14 @@ CMD_KEYWORD=
 
 kubectl create -f $APP_YAML
 
+#mimic a random time to trigger colibri
 sleep 10
 
 pid=$(ssh $USER@$HOSTNAME ps aux | grep $CMD_KEYWORD | grep "root" | awk '{print $2}')
 
-cp grabber.yml $CMD_KEYWORD.yml
+cp colibri.yml $CMD_KEYWORD.yml
 
-sed -i "s/1234/$pid/g" $CMD_KEYWORD.yml
+sed -i "s/APP_PID/$pid/g" $CMD_KEYWORD.yml
 
 kubectl create -f $CMD_KEYWORD.yml
 

@@ -35,6 +35,7 @@ const (
 
     cpu_dir = "cpu,cpuacct"
     mem_dir = "memory"
+
 )
 
 type Grabber struct {
@@ -252,16 +253,15 @@ func (g Grabber) getNetworkData(iface string, c chan []float64) {
 
 func main () {
 
-    var metric_type string
-    var pid, output_name, net_iface string
+    var metric_type, name, pid, output_name, net_iface string
     var interval_ms, iterate_num int
 
-
-    flag.StringVar(&metric_type, "mtype", "cpu", "What metric to get: cpu/mem/net. (default: cpu)")
+    flag.StringVar(&name, "name", "birdy", "The name of this work to indicate for standard output. (default: birdy)")
+    flag.StringVar(&metric_type, "mtype", "cpu", "What metric to get: cpu/mem/net/all. (default: cpu)")
     flag.StringVar(&pid, "pid", "0", "The process ID of the container")
     flag.IntVar(&interval_ms, "freq", 5, "The scraping interval in millisecond. (default: 5)")
     flag.IntVar(&iterate_num, "iter", 2000, "The scraping numbers. (default: 2000)")
-    flag.StringVar(&output_name, "out", "none", "Output name of the metrics")
+    flag.StringVar(&output_name, "out", "none", "Output file for the metrics")
     flag.StringVar(&net_iface, "iface", "eth0", "The name of network interface of the container. Only used for grabbing network metrics. (default: eth0)")
     flag.Parse()
 
@@ -292,14 +292,18 @@ func main () {
             go grabber.getMemoryData(mem_c)
             go grabber.getNetworkData(net_iface, net_c)
             cpu_out, mem_out, net_out := <-cpu_c, <-mem_c, <-net_c
-            log.Printf("CPU Avg: %d, 95-Percentile: %d\n", int(math.Round(cpu_out[0]/1000)),
-                                                           int(math.Round(cpu_out[1]/1000)))
-            log.Printf("RAM Avg: %d, 95-Percentile: %d\n", int(math.Round(mem_out[0]/1024/1024)),
-                                                           int(math.Round(mem_out[1]/1024/1024)))
-            log.Printf("NET Ingress Avg: %s, 95-Percentile: %s\n", transBandwidthUnit(net_out[0]),
-                                                                   transBandwidthUnit(net_out[1]))
-            log.Printf("NET Egress Avg: %s, 95-Percentile: %s\n", transBandwidthUnit(net_out[2]),
-                                                                  transBandwidthUnit(net_out[3]))
+            log.Printf("%s -- CPU Avg: %d, 95-Percentile: %d\n", name,
+                                                                int(math.Round(cpu_out[0]/1000)),
+                                                                int(math.Round(cpu_out[1]/1000)))
+            log.Printf("%s -- RAM Avg: %d, 95-Percentile: %d\n", name,
+                                                                int(math.Round(mem_out[0]/1024/1024)),
+                                                                int(math.Round(mem_out[1]/1024/1024)))
+            log.Printf("%s -- NET Ingress Avg: %s, 95-Percentile: %s\n", name,
+                                                                        transBandwidthUnit(net_out[0]),
+                                                                        transBandwidthUnit(net_out[1]))
+            log.Printf("%s -- NET Egress Avg: %s, 95-Percentile: %s\n", name,
+                                                                       transBandwidthUnit(net_out[2]),
+                                                                       transBandwidthUnit(net_out[3]))
 
         default:
             log.Fatal("metric_type is not in the handling list")
