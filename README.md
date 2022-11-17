@@ -18,14 +18,15 @@ Then, we can get the process id `9189` is for the container.
 
 ## Build the image
 
-## Run metrics grabber container
+## Run Colibri job container
 
 After building the image, to run this job-like container, please refer to following key points:
 
 ### Parameters
 
 There are four dynamic input parameters as following:
-
+- `name`: A unique name for standard metrics output of the specific container. 
+This parameter is used to differenciate the containers in a single Pod.
 - `pid`: The process id of the container, must specifying the correct one so to get the metrics you want.
 - `mtype`: The types of metric for collection, `cpu`, `mem`, `net` or `all`, `all` will run all three metric types. By default is `cpu`. 
 - `freq`: The frequency of getting numbers. The unit is millisecond. By default is `5`. 
@@ -33,6 +34,7 @@ There are four dynamic input parameters as following:
 - `out`: The prefix of output files. By default it is `none`, there will be no output of raw metrics. If the value is assigned with `test`,
 there will come out files named `test_*`
 - `iface`: The network interface of the container which you want to get metrics. Only used when `mtype = net`. By default is `eth0`.
+- `pert`: The percentile of the metrics shown in standard output. By default is `95`.
 
 ### Mounting points
 
@@ -45,13 +47,13 @@ While the mounting points on container is hardcoded in the program, be awared to
 
 ### The example command
 
-Based on previous sections, you can run metrics grabber with the carefully configured command.
+Based on previous sections, you can run Colibri job with the carefully configured command.
 
 ```
-$ docker run -v /proc:/test/proc -v /sys/fs/cgroup:/tmp/cgroup -v /my-grabber/log/:/output colibri:latest colibri --pid 1234 --mtype net --freq 10 --iter 24000 --out yoman 
+$ docker run -v /proc:/test/proc -v /sys/fs/cgroup:/tmp/cgroup -v /my-colibri/log/:/output colibri:latest colibri --pid 1234 --mtype net --freq 10 --iter 24000 --out yoman --pert 98
 ```
 
 ### Running with Kubernetes
 
-We can also run our metrics grabber through K8s, for getting the metrics on specific workers.
-Please refer to the file `./k8s/grabber.yml` and `./k8s/run_grabber.sh`.
+We can also run our Colibri job through K8s, for getting the metrics on specific workers.
+Please refer to the file `./k8s/colibri-job.yml` and `./k8s/run_colibri_job.sh`.

@@ -25,8 +25,6 @@ import (
     "github.com/montanaflynn/stats"
 )
 
-const percent = 95
-
 func stringToInt(str string) int {
     n, _ := strconv.Atoi(str)
     return n
@@ -70,7 +68,7 @@ func createOutputFile(filename string) *os.File {
     return f
 }
 
-func countRate(data []string, interval int) []float64 {
+func countRate(data []string, interval int, percent float64) []float64 {
 
     res := make([]float64, 2)
     float_data := make([]float64, len(data)-1)
@@ -80,16 +78,16 @@ func countRate(data []string, interval int) []float64 {
     }
 
     res[0], _ = stats.Mean(float_data)
-    res[1], _ = stats.Percentile(float_data, 95)
+    res[1], _ = stats.Percentile(float_data, percent)
 
     return res
 }
 
-func countValue(data []float64) []float64 {
+func countValue(data []float64, percent float64) []float64 {
 
     res := make([]float64, 2)
     res[0], _ = stats.Mean(data)
-    res[1], _ = stats.Percentile(data, 95)
+    res[1], _ = stats.Percentile(data, percent)
     return res
 }
 
