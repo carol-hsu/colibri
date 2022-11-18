@@ -25,9 +25,9 @@ import (
     "github.com/montanaflynn/stats"
 )
 
-func stringToInt(str string) int {
-    n, _ := strconv.Atoi(str)
-    return n
+func stringToFloat(str string) float64 {
+    f, _ := strconv.ParseFloat(str, 64)
+    return f
 }
 
 func getCgroupMetricPath(cgroup_path string, keyword string) string {
@@ -74,7 +74,7 @@ func countRate(data []string, interval int, percent float64) []float64 {
     float_data := make([]float64, len(data)-1)
 
     for i := 0; i < len(data)-1; i++ {
-        float_data[i] = float64((stringToInt(data[i+1]) - stringToInt(data[i])) / interval)
+        float_data[i] = (stringToFloat(data[i+1]) - stringToFloat(data[i])) / float64(interval)
     }
 
     res[0], _ = stats.Mean(float_data)
