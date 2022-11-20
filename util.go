@@ -19,7 +19,6 @@ import (
     "log"
     "os"
     "math"
-    "io/ioutil"
     "strings"
     "strconv"
     "github.com/montanaflynn/stats"
@@ -28,23 +27,6 @@ import (
 func stringToFloat(str string) float64 {
     f, _ := strconv.ParseFloat(str, 64)
     return f
-}
-
-func getCgroupMetricPath(cgroup_path string, keyword string) string {
-
-    file_content, err := ioutil.ReadFile(cgroup_path)
-
-    if err != nil {
-        fmt.Printf("Error: %v\n", err)
-    } else {
-        for _, path := range strings.Split(string(file_content), "\n") {
-            if strings.Contains(path, keyword) {
-                return strings.Split(path, ":")[2]
-            }
-        }
-    }
-    return ""
-
 }
 
 // to find which row of data contains the keyword, which would be the information we want

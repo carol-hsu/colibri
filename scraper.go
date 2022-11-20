@@ -24,20 +24,6 @@ import (
     "strings"
 )
 
-const (
-
-    // cgroup_path = "/sys/fs/cgroups/" could be replaced by below
-    // To avoid mixing host's data to container(scraper)'s data, we will mount host data to /tmp
-    pid_cgroup_path = "/tmp/proc/{pid}/cgroup" //comes out the full path of CPU and RAM
-    net_metrics_path = "/tmp/proc/{pid}/net/dev"
-    sys_fs_path = "/tmp/cgroup/"
-    output_path = "/output/"
-
-    cpu_dir = "cpu,cpuacct"
-    mem_dir = "memory"
-
-)
-
 type Scraper struct {
     // The process ID of the container
     pid string
@@ -51,15 +37,11 @@ type Scraper struct {
     pert float64
 }
 
-func (s Scraper) getCpuData(c chan []float64) {
+const output_path = "/output/"
 
-    container_path := getCgroupMetricPath(strings.Replace(pid_cgroup_path, "{pid}", s.pid, 1), cpu_dir)
+func (s Scraper) getCpuData() []float64 {
 
-    if container_path == "" {
-        log.Fatal("Error: failed to find the path of CPU data\n")
-    }
-
-    cpu_data_fullpath := sys_fs_path + cpu_dir + container_path + "/cpuacct.usage"
+    cpu_data_fullpath := getCpuPath(s.pid)
 
     var outputs = []string{}
 
@@ -89,29 +71,12 @@ func (s Scraper) getCpuData(c chan []float64) {
         }
     }
 
-    res := countRate(outputs, s.ms, s.pert)
-
-    if c != nil{
-        //sending for done
-        c <- res
-    }else{
-        log.Printf("CPU Avg: %d, %.2f-Percentile: %d\n", int(math.Round(res[0]/1000)), s.pert,
-                                                         int(math.Round(res[1]/1000)))
-    }
-
-    return
+    return countRate(outputs, s.ms, s.pert)
 }
 
-func (s Scraper) getMemoryData(c chan []float64) {
+func (s Scraper) getMemoryData() []float64 {
 
-    container_path := getCgroupMetricPath(strings.Replace(pid_cgroup_path, "{pid}", s.pid, 1), mem_dir)
-
-    if container_path == "" {
-        log.Fatal("Error: failed to find the path of Memory data\n")
-    }
-
-    usage_file := sys_fs_path + mem_dir + container_path + "/memory.usage_in_bytes"
-    stats_file := sys_fs_path + mem_dir + container_path + "/memory.stat"
+    usage_file, stats_file := getMemPath(s.pid)
 
     var usage_outputs, stats_outputs = []string{}, []string{}
 
@@ -167,23 +132,13 @@ func (s Scraper) getMemoryData(c chan []float64) {
         }
     }
 
-    res := countValue(outputs, s.pert)
-
-    if c != nil{
-        //sending for done
-        c <- res
-    }else{
-        // print result
-        log.Printf("RAM Avg: %d, %.2f-Percentile: %d\n", int(math.Round(res[0]/1024/1024)), s.pert,
-                                                         int(math.Round(res[1]/1024/1024)))
-    }
-    return
+    return countValue(outputs, s.pert)
 }
 
-func (s Scraper) getNetworkData(iface string, c chan []float64) {
+func (s Scraper) getNetworkData(iface string) []float64 {
 
     var outputs =[]string{}
-    path := strings.Replace(net_metrics_path, "{pid}", s.pid, 1)
+    path := getNetPath(s.pid)
 
     for i := 0; i < s.iter; i++ {
         net_stat, err := ioutil.ReadFile(path)
@@ -206,8 +161,7 @@ func (s Scraper) getNetworkData(iface string, c chan []float64) {
     eth0_idx := findIndex(outputs[0], iface)
 
     if eth0_idx < 0 {
-        log.Printf("No info for %s\n", iface)
-        return
+        log.Fatal("No info for the specified interface")
     }
 
     //parse bandwidth value, and store separately
@@ -239,18 +193,18 @@ func (s Scraper) getNetworkData(iface string, c chan []float64) {
     ig_res := countRate(ig_bw, s.ms, s.pert)
     eg_res := countRate(eg_bw, s.ms, s.pert)
 
-    if c != nil{
-        c <- append(ig_res, eg_res...)
-        return
-    }else {
-        // print result
-        log.Printf("Ingress Avg: %s, %.2f-Percentile: %s\n", transBandwidthUnit(ig_res[0]), s.pert,
-                                                             transBandwidthUnit(ig_res[1]))
-        log.Printf("Egress Avg: %s, %.2f-Percentile: %s\n", transBandwidthUnit(eg_res[0]), s.pert,
-                                                            transBandwidthUnit(eg_res[1]))
-    }
 
-    return
+    return append(ig_res, eg_res...)
+}
+
+func getCpuValue(path string) string {
+
+    v, err  := ioutil.ReadFile(path)
+    if err != nil {
+        log.Print("Cannot read usage file of cpu.")
+        return ""
+    }
+    return strings.TrimSpace(string(v))
 }
 
 func getMemoryValue(usage_path string, stats_path string, idx int) float64 {
@@ -273,9 +227,9 @@ func getMemoryValue(usage_path string, stats_path string, idx int) float64 {
     return stringToFloat(usage_output) - stringToFloat(strings.Fields(strings.Split(stats_output, "\n")[idx])[1])
 }
 
-func getInactiveFileIndex(stats_path string) int {
+func getInactiveFileIndex(path string) int {
 
-    stats, err  := ioutil.ReadFile(stats_path)
+    stats, err  := ioutil.ReadFile(path)
     if err != nil {
         log.Print("Cannot read statistic file of memory.")
         return -1
@@ -284,14 +238,91 @@ func getInactiveFileIndex(stats_path string) int {
     return findIndex(string(stats), "total_inactive_file")
 }
 
-func (s Scraper) getAllData(iface string) {
-    //test for collect memory first ..
-    container_path := getCgroupMetricPath(strings.Replace(pid_cgroup_path, "{pid}", s.pid, 1), mem_dir)
+func getNetworkValue(path string, idx int) (string, string) {
 
-    if container_path == "" {
-        log.Fatal("Error: failed to find the path of Memory data\n")
+    net_stat, err := ioutil.ReadFile(path)
+    if err != nil {
+        log.Print("Cannot read statistic file of network.")
+        return "", ""
+    }
+    stats := strings.Fields(strings.Split(string(net_stat), "\n")[idx])
+
+    return stats[1], stats[9]
+}
+
+func getIfaceIndex(path string, iface string) int {
+
+    stats, err  := ioutil.ReadFile(path)
+    if err != nil {
+        log.Print("Cannot read statistic file of network.")
+        return -1
     }
 
+    return findIndex(string(stats), iface)
+}
+
+func (s Scraper) getAllData(iface string) ([]float64, []float64, []float64) {
+    //get path of container
+    cpu_path := getCpuPath(s.pid)
+    usage_path, stats_path := getMemPath(s.pid)
+    net_path := getNetPath(s.pid)
+
+    var cpu_outputs, ig_outputs, eg_outputs []string
+    var mem_outputs = []float64{}
+
+    //get index for collecting data from memory statistic file
+    mem_idx := getInactiveFileIndex(stats_path)
+    net_idx := getIfaceIndex(net_path, iface)
+
+    //start metrics scraping period
+    for i:=0; i < s.iter; i++ {
+        cpu_v := getCpuValue(cpu_path)
+        mem_v := getMemoryValue(usage_path, stats_path, mem_idx)
+        ig_bw, eg_bw := getNetworkValue(net_path, net_idx)
+
+        if mem_v < 0 || len(cpu_v) == 0 || len(ig_bw) == 0 {
+            log.Print("App stopped earlier, starting to print output")
+            break
+        }
+
+        cpu_outputs = append(cpu_outputs, cpu_v)
+        mem_outputs = append(mem_outputs, mem_v)
+        ig_outputs = append(ig_outputs, ig_bw)
+        eg_outputs = append(eg_outputs, eg_bw)
+
+        time.Sleep(time.Duration(s.ms) * time.Millisecond)
+    }
+
+    //if output_name == none, then don't write out, just print analysis result
+    if s.out != "none" {
+        file_prefix := output_path + s.out + "_" +fmt.Sprint(s.ms)
+
+        cpu_f := createOutputFile(file_prefix + "ms_cpu")
+        defer cpu_f.Close()
+
+        mem_f := createOutputFile(file_prefix + "ms_mem")
+        defer mem_f.Close()
+
+        ig_f := createOutputFile(file_prefix + "ms_ig_bytes")
+        defer ig_f.Close()
+
+        eg_f := createOutputFile(file_prefix + "ms_eg_bytes")
+        defer eg_f.Close()
+
+        for i := 0; i < len(cpu_outputs); i++ {
+            cpu_f.WriteString(cpu_outputs[i]+"\n")
+            mem_f.WriteString(fmt.Sprintf("%.0f\n", mem_outputs[i]))
+            ig_f.WriteString(ig_outputs[i]+"\n")
+            eg_f.WriteString(eg_outputs[i]+"\n")
+        }
+    }
+
+    cpu_res := countRate(cpu_outputs, s.ms, s.pert)
+    mem_res := countValue(mem_outputs, s.pert)
+    ig_res := countRate(ig_outputs, s.ms, s.pert)
+    eg_res := countRate(eg_outputs, s.ms, s.pert)
+
+    return cpu_res, mem_res, append(ig_res, eg_res...)
 }
 
 func main () {
@@ -320,38 +351,45 @@ func main () {
     switch metric_type {
         case "cpu" :
             log.Print("Starting to get CPU data")
-            scraper.getCpuData(nil)
+            res := scraper.getCpuData()
+            log.Printf("%s -- CPU Avg: %d, %.2f-Percentile: %d\n", name,
+                                                                   int(math.Round(res[0]/1000)), percentile,
+                                                                   int(math.Round(res[1]/1000)))
 
         case "mem" :
             log.Print("Starting to get RAM data")
-            scraper.getMemoryData(nil)
+            res := scraper.getMemoryData()
+            log.Printf("%s -- RAM Avg: %d, %.2f-Percentile: %d\n", name,
+                                                                   int(math.Round(res[0]/1024/1024)), percentile,
+                                                                   int(math.Round(res[1]/1024/1024)))
 
         case "net" :
             log.Print("Starting to get network data")
-            scraper.getNetworkData(net_iface, nil)
+            res := scraper.getNetworkData(net_iface)
+            log.Printf("%s -- Ingress Avg: %s, %.2f-Percentile: %s\n", name,
+                                                                       transBandwidthUnit(res[0]), percentile,
+                                                                       transBandwidthUnit(res[1]))
+            log.Printf("%s -- Egress Avg: %s, %.2f-Percentile: %s\n", name,
+                                                                      transBandwidthUnit(res[2]), percentile,
+                                                                      transBandwidthUnit(res[3]))
 
         case "all":
-            log.Print("Starting to get all metrics")
-            cpu_c, mem_c, net_c := make(chan []float64), make(chan []float64), make(chan []float64)
-            go scraper.getCpuData(cpu_c)
-            go scraper.getMemoryData(mem_c)
-            go scraper.getNetworkData(net_iface, net_c)
-            cpu_out, mem_out, net_out := <-cpu_c, <-mem_c, <-net_c
+            log.Print("Starting to get all metrics: TEST")
+            cpu_res, mem_res, net_res := scraper.getAllData(net_iface)
+
             log.Printf("%s -- CPU Avg: %d, %.2f-Percentile: %d\n", name,
-                                                                int(math.Round(cpu_out[0]/1000)), percentile,
-                                                                int(math.Round(cpu_out[1]/1000)))
+                                                                   int(math.Round(cpu_res[0]/1000)), percentile,
+                                                                   int(math.Round(cpu_res[1]/1000)))
             log.Printf("%s -- RAM Avg: %d, %.2f-Percentile: %d\n", name,
-                                                                int(math.Round(mem_out[0]/1024/1024)), percentile,
-                                                                int(math.Round(mem_out[1]/1024/1024)))
+                                                                   int(math.Round(mem_res[0]/1024/1024)), percentile,
+                                                                   int(math.Round(mem_res[1]/1024/1024)))
             log.Printf("%s -- NET Ingress Avg: %s, %.2f-Percentile: %s\n", name,
-                                                                        transBandwidthUnit(net_out[0]), percentile,
-                                                                        transBandwidthUnit(net_out[1]))
+                                                                           transBandwidthUnit(net_res[0]), percentile,
+                                                                           transBandwidthUnit(net_res[1]))
             log.Printf("%s -- NET Egress Avg: %s, %.2f-Percentile: %s\n", name,
-                                                                       transBandwidthUnit(net_out[2]), percentile,
-                                                                       transBandwidthUnit(net_out[3]))
-        case "test":
-            log.Print("Starting to get all metrics")
-            scraper.getAllData(net_iface)
+                                                                          transBandwidthUnit(net_res[2]), percentile,
+                                                                          transBandwidthUnit(net_res[3]))
+
         default:
             log.Fatal("metric_type is not in the handling list")
     }
