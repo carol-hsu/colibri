@@ -73,12 +73,21 @@ func countValue(data []float64, percent float64) []float64 {
     return res
 }
 
+func transCpuUnit(cpu float64) string {
+    return strconv.Itoa(int(math.Round(cpu/1000)))+"m"
+}
+
+func transMemoryUnit(ram float64) string {
+    return strconv.Itoa(int(math.Round(ram/1024/1024)))+"Mi"
+}
+
 func transBandwidthUnit(bw float64) string {
     // change X/ms to Y/s, Y's minimum unit is k
     // check if the value fit for k or M
     if (bw*1000/1024) < 1 {
     // less than 1 KB, return minimal one
-        return "1k"
+          return fmt.Sprint(math.Round(bw*1000))
+    //    return "1k"
     }else if (bw*1000/1024/1024) < 1 {
     // less than KB use "k"
         return fmt.Sprint(math.Round(bw*1000/1024))+"k"
@@ -86,4 +95,10 @@ func transBandwidthUnit(bw float64) string {
     // larger than MB, use "M"
         return fmt.Sprint(math.Round(bw*1000/1024/1024))+"M"
     }
+}
+
+func printResult(workName string, metricName string, avgValue string, pertValue string, pert float64) {
+
+    log.Printf("%s -- %s Avg: %s, %.2f-Percentile: %s\n", workName, metricName, avgValue, pert, pertValue)
+
 }

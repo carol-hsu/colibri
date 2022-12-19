@@ -19,7 +19,6 @@ import (
     "flag"
     "fmt"
     "log"
-    "math"
     "io/ioutil"
     "strings"
 )
@@ -61,9 +60,9 @@ func (s Scraper) getCpuData() []float64 {
     }
 
     log.Print("CPU metrics collection is finished. Start to post-process data ...")
-    //if output_name == none, then don't write out, just print analysis result
-    if s.out != "none" {
-        f := createOutputFile(output_path + s.out + "_" +fmt.Sprint(s.ms) + "ms_cpu")
+    //if outputName == none, then don't write out, just print analysis result
+    if strings.Contains(s.out, "file:") {
+        f := createOutputFile(output_path + s.out[5:] + "_" +fmt.Sprint(s.ms) + "ms_cpu")
         defer f.Close()
 
         for i:=0; i<len(outputs); i++ {
@@ -121,9 +120,9 @@ func (s Scraper) getMemoryData() []float64 {
         outputs[i] = v
     }
 
-    //if output_name == none, then don't write out, just print analysis result
-    if s.out != "none" {
-        f := createOutputFile(output_path + s.out + "_" +fmt.Sprint(s.ms) + "ms_mem")
+    //if outputName == none, then don't write out, just print analysis result
+    if strings.Contains(s.out, "file:") {
+        f := createOutputFile(output_path + s.out[5:] + "_" +fmt.Sprint(s.ms) + "ms_mem")
         defer f.Close()
 
 
@@ -175,10 +174,10 @@ func (s Scraper) getNetworkData(iface string) []float64 {
         eg_bw[i] = metrics[9]
     }
 
-    //if output_name == none, then don't write out, just print analysis result
-    if s.out != "none" {
-        ig_file := createOutputFile(output_path + s.out + "_" + fmt.Sprint(s.ms) + "ms_ig_bytes")
-        eg_file := createOutputFile(output_path + s.out + "_" + fmt.Sprint(s.ms) + "ms_eg_bytes")
+    //if outputName == none, then don't write out, just print analysis result
+    if strings.Contains(s.out, "file:") {
+        ig_file := createOutputFile(output_path + s.out[5:] + "_" + fmt.Sprint(s.ms) + "ms_ig_bytes")
+        eg_file := createOutputFile(output_path + s.out[5:] + "_" + fmt.Sprint(s.ms) + "ms_eg_bytes")
 
         defer ig_file.Close()
         defer eg_file.Close()
@@ -293,9 +292,9 @@ func (s Scraper) getAllData(iface string) ([]float64, []float64, []float64) {
         time.Sleep(time.Duration(s.ms) * time.Millisecond)
     }
 
-    //if output_name == none, then don't write out, just print analysis result
-    if s.out != "none" {
-        file_prefix := output_path + s.out + "_" +fmt.Sprint(s.ms)
+    //if outputName == none, then don't write out, just print analysis result
+    if strings.Contains(s.out, "file:") {
+        file_prefix := output_path + s.out[5:] + "_" +fmt.Sprint(s.ms)
 
         cpu_f := createOutputFile(file_prefix + "ms_cpu")
         defer cpu_f.Close()
@@ -327,71 +326,89 @@ func (s Scraper) getAllData(iface string) ([]float64, []float64, []float64) {
 
 func main () {
 
-    var metric_type, name, pid, output_name, net_iface string
-    var interval_ms, iterate_num int
+    var metricType, name, pid, outputName, netIface string
+    var intervalMsec, iterateNum int
     var percentile float64
 
     flag.StringVar(&name, "name", "birdy", "The name of this work to indicate for standard output. (default: birdy)")
-    flag.StringVar(&metric_type, "mtype", "cpu", "What metric to s.t: cpu/mem/net/all. (default: cpu)")
+    flag.StringVar(&metricType, "mtype", "cpu", "What metric to s.t: cpu/mem/net/all. (default: cpu)")
     flag.StringVar(&pid, "pid", "0", "The process ID of the container")
-    flag.IntVar(&interval_ms, "freq", 5, "The scraping interval in millisecond. (default: 5)")
-    flag.IntVar(&iterate_num, "iter", 2000, "The scraping numbers. (default: 2000)")
+    flag.IntVar(&intervalMsec, "freq", 5, "The scraping interval in millisecond. (default: 5)")
+    flag.IntVar(&iterateNum, "iter", 2000, "The scraping numbers. (default: 2000)")
     flag.Float64Var(&percentile, "pert", 95, "The percentile value for analytics. (default: 95)")
-    flag.StringVar(&output_name, "out", "none", "Output file for the metrics")
-    flag.StringVar(&net_iface, "iface", "eth0", "The name of network interface of the container. Only used for s.abbing network metrics. (default: eth0)")
+    flag.StringVar(&outputName, "out", "none", "Output file for the metrics")
+    flag.StringVar(&netIface, "iface", "eth0", "The name of network interface of the container. Only used for s.abbing network metrics. (default: eth0)")
     flag.Parse()
 
-    if interval_ms <= 0 {
-        log.Print("Monitoring process cannot be processed with interval_ms less and equal 0.")
+    if intervalMsec <= 0 {
+        log.Print("Monitoring process cannot be processed with intervalMsec less and equal 0.")
         return
     }
-    scraper := Scraper{pid, output_name, interval_ms, iterate_num, percentile}
+    scraper := Scraper{pid, outputName, intervalMsec, iterateNum, percentile}
 
     //getting numbers by type
-    switch metric_type {
+    switch metricType {
         case "cpu" :
             log.Print("Starting to get CPU data")
             res := scraper.getCpuData()
-            log.Printf("%s -- CPU Avg: %d, %.2f-Percentile: %d\n", name,
-                                                                   int(math.Round(res[0]/1000)), percentile,
-                                                                   int(math.Round(res[1]/1000)))
+            pertRes := transCpuUnit(res[1])
+            printResult(name, "CPU", transCpuUnit(res[0]), pertRes, percentile)
+
+            if scraper.out[:4] == "api:" {
+                log.Println("Calling API!")
+                sendMetric([]byte(`{ "cpu" : "` + pertRes + `" }`), scraper.out[4:])
+            }
 
         case "mem" :
             log.Print("Starting to get RAM data")
             res := scraper.getMemoryData()
-            log.Printf("%s -- RAM Avg: %d, %.2f-Percentile: %d\n", name,
-                                                                   int(math.Round(res[0]/1024/1024)), percentile,
-                                                                   int(math.Round(res[1]/1024/1024)))
+            pertRes := transMemoryUnit(res[1])
+            printResult(name, "RAM", transMemoryUnit(res[0]), pertRes, percentile)
+
+            if scraper.out[:4] == "api:" {
+                log.Println("Calling API!")
+                sendMetric([]byte(`{ "ram" : "` + pertRes + `" }`), scraper.out[4:])
+            }
 
         case "net" :
             log.Print("Starting to get network data")
-            res := scraper.getNetworkData(net_iface)
-            log.Printf("%s -- Ingress Avg: %s, %.2f-Percentile: %s\n", name,
-                                                                       transBandwidthUnit(res[0]), percentile,
-                                                                       transBandwidthUnit(res[1]))
-            log.Printf("%s -- Egress Avg: %s, %.2f-Percentile: %s\n", name,
-                                                                      transBandwidthUnit(res[2]), percentile,
-                                                                      transBandwidthUnit(res[3]))
+            res := scraper.getNetworkData(netIface)
+            igPertRes := transBandwidthUnit(res[1])
+            egPertRes := transBandwidthUnit(res[3])
+            printResult(name, "Ingress", transBandwidthUnit(res[0]), igPertRes, percentile)
+            printResult(name, "Egress", transBandwidthUnit(res[2]), egPertRes, percentile)
+
+            if scraper.out[:4] == "api:" {
+                log.Println("Calling API!")
+                sendMetric([]byte(`{ "ingress" : "` + igPertRes + `", "egress" : "` + egPertRes + `" }`), scraper.out[4:])
+            }
 
         case "all":
-            log.Print("Starting to get all metrics: TEST")
-            cpu_res, mem_res, net_res := scraper.getAllData(net_iface)
+            log.Print("Starting to get all metrics: ")
+            cpuRes, memRes, netRes := scraper.getAllData(netIface)
 
-            log.Printf("%s -- CPU Avg: %d, %.2f-Percentile: %d\n", name,
-                                                                   int(math.Round(cpu_res[0]/1000)), percentile,
-                                                                   int(math.Round(cpu_res[1]/1000)))
-            log.Printf("%s -- RAM Avg: %d, %.2f-Percentile: %d\n", name,
-                                                                   int(math.Round(mem_res[0]/1024/1024)), percentile,
-                                                                   int(math.Round(mem_res[1]/1024/1024)))
-            log.Printf("%s -- NET Ingress Avg: %s, %.2f-Percentile: %s\n", name,
-                                                                           transBandwidthUnit(net_res[0]), percentile,
-                                                                           transBandwidthUnit(net_res[1]))
-            log.Printf("%s -- NET Egress Avg: %s, %.2f-Percentile: %s\n", name,
-                                                                          transBandwidthUnit(net_res[2]), percentile,
-                                                                          transBandwidthUnit(net_res[3]))
+            cpuPertRes := transCpuUnit(cpuRes[1])
+            printResult(name, "CPU", transCpuUnit(cpuRes[0]), cpuPertRes, percentile)
+
+            memPertRes := transMemoryUnit(memRes[1])
+            printResult(name, "RAM", transMemoryUnit(memRes[0]), memPertRes, percentile)
+
+            igPertRes := transBandwidthUnit(netRes[1])
+            egPertRes := transBandwidthUnit(netRes[3])
+            printResult(name, "Ingress", transBandwidthUnit(netRes[0]), igPertRes, percentile)
+            printResult(name, "Egress", transBandwidthUnit(netRes[2]), egPertRes, percentile)
+
+            if scraper.out[:4] == "api:" {
+                log.Println("Calling API!")
+                sendMetric([]byte(`{ "cpu": "` + cpuPertRes +
+                                 `", "ram": "` + memPertRes +
+                                 `", "ingress": "` + igPertRes +
+                                 `", "egress": "` + egPertRes + `" }`), scraper.out[4:])
+            }
+
 
         default:
-            log.Fatal("metric_type is not in the handling list")
+            log.Fatal("metric type is not in the handling list")
     }
 
     log.Print("Colibri is successfully completed !")
