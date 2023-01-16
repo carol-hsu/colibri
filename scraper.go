@@ -340,6 +340,8 @@ func main () {
     flag.StringVar(&netIface, "iface", "eth0", "The name of network interface of the container. Only used for s.abbing network metrics. (default: eth0)")
     flag.Parse()
 
+    log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+
     if intervalMsec <= 0 {
         log.Print("Monitoring process cannot be processed with intervalMsec less and equal 0.")
         return
