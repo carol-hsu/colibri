@@ -18,6 +18,12 @@ Then, we can get the process id `9189` is for the container.
 
 ## Build the image
 
+You can build image with the root Dockerfile at the root directory.
+
+```
+$ docker build -t colibri .
+```
+
 ## Run Colibri job container
 
 After building the image, to run this job-like container, please refer to following key points:
