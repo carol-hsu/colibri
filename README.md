@@ -35,12 +35,11 @@ This parameter is used to differenciate the containers in a single Pod.
 Currently we only support either of them. Must added an another prefix "file:" or "api:" to indicate what kind of special output
 you target for.
 
-By default it is `none`, there will be no output of raw metrics. 
+  By default it is `none`, there will be no output of raw metrics. 
 
-If the value is assigned to `file:/tmp/colibri/test`,
-there will come out files named `test_*` and be put at `/tmp/colibri`;
+  If the value is assigned to `file:/tmp/colibri/test`, there will come out files named `test_*` and be put at `/tmp/colibri`;
 
-If the value is assigned to `api:default.my-private-registry-866f6fd9b7-48wq7.1234`,
+  If the value is assigned to `api:default.my-private-registry-866f6fd9b7-48wq7.1234`, 
 it is a uuid for sending analytics numbers to Colibri API server for storage.
 The value points to a container with process ID `1234`, 
 it is running in the Pod "my-private-registry-866f6fd9b7-48wq7" in "default" Namespace.
