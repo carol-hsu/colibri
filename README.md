@@ -34,14 +34,18 @@ This parameter is used to differenciate the containers in a single Pod.
 - `out`: The prefix of output files for raw metircs storage; or API unique ID for storing the analytic results.
 Currently we only support either of them. Must added an another prefix "file:" or "api:" to indicate what kind of special output
 you target for.
+
 By default it is `none`, there will be no output of raw metrics. 
+
 If the value is assigned to `file:/tmp/colibri/test`,
 there will come out files named `test_*` and be put at `/tmp/colibri`;
+
 If the value is assigned to `api:default.my-private-registry-866f6fd9b7-48wq7.1234`,
 it is a uuid for sending analytics numbers to Colibri API server for storage.
 The value points to a container with process ID `1234`, 
 it is running in the Pod "my-private-registry-866f6fd9b7-48wq7" in "default" Namespace.
 If these information is not correct, Colibri API server will block this process.
+
 - `iface`: The network interface of the container which you want to get metrics. Only used when `mtype = net`. By default is `eth0`.
 - `pert`: The percentile of the metrics shown in standard output. By default is `95`.
 
@@ -80,6 +84,8 @@ Please refer to the file `./k8s/colibri.yml` and `./k8s/run_colibri.sh`.
 4. Run Colibri Job, after it is finished, check the metrics querying results.
 
 #### Work with Colibri API server
-
+You can check `./k8s/colibri-api-callback.yml`. 
+We will run a job with proper permission attached to it.
+The other job configurations are similar to the standalone version. Just be careful of the flag `--out`.
 
 
