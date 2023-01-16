@@ -336,7 +336,7 @@ func main () {
     flag.IntVar(&intervalMsec, "freq", 5, "The scraping interval in millisecond. (default: 5)")
     flag.IntVar(&iterateNum, "iter", 2000, "The scraping numbers. (default: 2000)")
     flag.Float64Var(&percentile, "pert", 95, "The percentile value for analytics. (default: 95)")
-    flag.StringVar(&outputName, "out", "none", "Output file for the metrics")
+    flag.StringVar(&outputName, "out", "none", "Output file or API unique ID for storing the metrics")
     flag.StringVar(&netIface, "iface", "eth0", "The name of network interface of the container. Only used for s.abbing network metrics. (default: eth0)")
     flag.Parse()
 

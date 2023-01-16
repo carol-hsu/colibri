@@ -31,8 +31,17 @@ This parameter is used to differenciate the containers in a single Pod.
 - `mtype`: The types of metric for collection, `cpu`, `mem`, `net` or `all`, `all` will run all three metric types. By default is `cpu`. 
 - `freq`: The frequency of getting numbers. The unit is millisecond. By default is `5`. 
 - `iter`: The iterations of getting numbers. By default is `2000`. 
-- `out`: The prefix of output files. By default it is `none`, there will be no output of raw metrics. If the value is assigned with `test`,
-there will come out files named `test_*`
+- `out`: The prefix of output files for raw metircs storage; or API unique ID for storing the analytic results.
+Currently we only support either of them. Must added an another prefix "file:" or "api:" to indicate what kind of special output
+you target for.
+By default it is `none`, there will be no output of raw metrics. 
+If the value is assigned to `file:/tmp/colibri/test`,
+there will come out files named `test_*` and be put at `/tmp/colibri`;
+If the value is assigned to `api:default.my-private-registry-866f6fd9b7-48wq7.1234`,
+it is a uuid for sending analytics numbers to Colibri API server for storage.
+The value points to a container with process ID `1234`, 
+it is running in the Pod "my-private-registry-866f6fd9b7-48wq7" in "default" Namespace.
+If these information is not correct, Colibri API server will block this process.
 - `iface`: The network interface of the container which you want to get metrics. Only used when `mtype = net`. By default is `eth0`.
 - `pert`: The percentile of the metrics shown in standard output. By default is `95`.
 
@@ -63,7 +72,14 @@ Please refer to the file `./k8s/colibri.yml` and `./k8s/run_colibri.sh`.
 `run_colibri.sh` is a helper script which gives some directions for how to work with the standalone Colibri job:
 1. Run your application (marked as `$APP_YAML`).
 
+2. Get the process ID of your application's container 
+(fetched by `$CMD_KEYWORD`, and accessed with `$USER` and `$HOSTNAME`, where is running the application).
+
+3. Add the process ID to Colibri K8s YAML.
+
+4. Run Colibri Job, after it is finished, check the metrics querying results.
 
 #### Work with Colibri API server
+
 
 
