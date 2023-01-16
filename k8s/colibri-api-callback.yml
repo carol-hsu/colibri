@@ -63,11 +63,11 @@ spec:
           type: Directory
       - name: output
         hostPath:
-          path: /mnt/kubernetes/colibri/coli
+          path: OUTPUT_DIR
           type: Directory
       containers:
-      - name: cpu-grabber
-        image: gabbro:30500/colibri-job:latest
+      - name: get-all-metrics
+        image: colibri:latest
         imagePullPolicy: Never
         command: ["colibri", "--pid", "$(PID)", "--freq", "25", "--out", "$(OUTPUT)", "--iter", "480", "--mtype", "all"]
         env:

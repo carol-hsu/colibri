@@ -15,7 +15,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: grabber
+  name: colibri-job
 spec:
   template:
     spec:
@@ -35,10 +35,10 @@ spec:
           path: /mnt/output
           type: Directory
       containers:
-      - name: cpu-grabber
-        image: grabber:latest
+      - name: get-all-metrics
+        image: colibri:latest
         imagePullPolicy: Never
-        command: ["colibri", "--pid", "$(PID)", "--out", "$(OUTPUT)", "--freq", "10",]
+        command: ["colibri", "--pid", "$(PID)", "--out", "$(OUTPUT)", "--freq", "10", "--mtype", "all"]
         env:
         - name: PID
           value: "APP_PID"
@@ -52,18 +52,3 @@ spec:
         - mountPath: /output
           name: output
         # example of a specific metrics grabber
-      - name: net-grabber
-        image: grabber:latest
-        imagePullPolicy: Never
-        command: ["colibri", "--pid", "$(PID)", "--out", "$(OUTPUT)", "--mtype", "net", "--iface", "eno1"]
-        env:
-        - name: PID
-          value: "APP_PID"
-        - name: OUTPUT
-          value: none
-        volumeMounts:
-        - mountPath: /tmp/proc
-          name: proc-dir
-        - mountPath: /tmp/cgroup
-          name: cgroup-dir
-        - mountPath: /output

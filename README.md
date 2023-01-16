@@ -56,4 +56,14 @@ $ docker run -v /proc:/test/proc -v /sys/fs/cgroup:/tmp/cgroup -v /my-colibri/lo
 ### Running with Kubernetes
 
 We can also run our Colibri job through K8s, for getting the metrics on specific workers.
-Please refer to the file `./k8s/colibri-job.yml` and `./k8s/run_colibri_job.sh`.
+
+#### Run a standalone job
+Please refer to the file `./k8s/colibri.yml` and `./k8s/run_colibri.sh`.
+
+`run_colibri.sh` is a helper script which gives some directions for how to work with the standalone Colibri job:
+1. Run your application (marked as `$APP_YAML`).
+
+
+#### Work with Colibri API server
+
+

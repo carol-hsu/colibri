@@ -21,7 +21,7 @@ CMD_KEYWORD=
 
 kubectl create -f $APP_YAML
 
-#mimic a random time to trigger colibri
+# mimic a random time to trigger colibri
 sleep 10
 
 pid=$(ssh $USER@$HOSTNAME ps aux | grep $CMD_KEYWORD | grep "root" | awk '{print $2}')
@@ -32,5 +32,13 @@ sed -i "s/APP_PID/$pid/g" $CMD_KEYWORD.yml
 
 kubectl create -f $CMD_KEYWORD.yml
 
+# wait a while for metrics colleciton, change to any closer time to your querying configurations
+sleep 20
 
+colibri_pod=$(kubectl get pod | grep "colibri-job" | awk '{print $1}')
+while [ "$(kubectl get pod | grep "colibri-job" | awk '{print $3}')" = "Running" ]; do
+    sleep 1
+    echo "Waiting"
+done
 
+kubectl logs $colibri_pod
