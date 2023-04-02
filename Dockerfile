@@ -20,12 +20,14 @@ ENV GOOS=linux
 ENV GOARCH=amd64
 
 # build
-WORKDIR /go/src/colibri/
+WORKDIR /coli-build/
 COPY . .
 RUN GO111MODULE=on go mod download
-RUN go install -ldflags "-s -w -X main.version=$VERSION" colibri
+RUN go build -o colibri scraper.go request.go util.go path_finder.go
+RUN go build -o colibri_v2 scraper_v2.go request.go util.go path_finder.go
 
 # runtime image
 FROM gcr.io/google_containers/ubuntu-slim:0.14
-COPY --from=builder /go/bin/colibri /usr/bin/colibri
-CMD ["colibri"]
+COPY --from=builder /coli-build/colibri /usr/bin/colibri
+COPY --from=builder /coli-build/colibri_v2 /usr/bin/colibri_v2
+CMD ["colibri_v2"]

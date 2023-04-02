@@ -40,6 +40,10 @@ func getCgroupMetricPath(cgroupPath string, keyword string) string {
 
     if err != nil {
         fmt.Printf("Error: %v\n", err)
+    } else if len(keyword) == 0 {
+    // v2: return the first line, since it is the only line
+        return strings.TrimSpace(string(content))[10:]
+
     } else {
         for _, path := range strings.Split(string(content), "\n") {
             if strings.Contains(path, keyword) {
@@ -56,10 +60,22 @@ func getCpuPath(pid string) string {
     path := getCgroupMetricPath(strings.Replace(PidCgroupPath, "{pid}", pid, 1), CpuDirectory)
 
     if path == "" {
-        log.Fatal("Error: failed to find the path of CPU data\n")
+        log.Fatal("Error: (cgroup v1) failed to find the path of CPU data\n")
     }
 
     return VirtualFilesystemPath + CpuDirectory + path + "/cpuacct.usage"
+}
+
+
+func getCpuPathV2(pid string) string {
+
+    path := getCgroupMetricPath(strings.Replace(PidCgroupPath, "{pid}", pid, 1), "")
+
+    if path == "" {
+        log.Fatal("Error: (cgroup v2) failed to find the path of CPU data\n")
+    }
+
+    return VirtualFilesystemPath + path + "/cpu.stat"
 }
 
 func getMemPath(pid string) (string, string) {
@@ -74,6 +90,20 @@ func getMemPath(pid string) (string, string) {
            VirtualFilesystemPath + MemDirectory + path + "/memory.stat"
 
 }
+
+func getMemPathV2(pid string) (string, string) {
+
+    path := getCgroupMetricPath(strings.Replace(PidCgroupPath, "{pid}", pid, 1), "")
+
+    if path == "" {
+        log.Fatal("Error: failed to find the path of Memory data\n")
+    }
+
+    return VirtualFilesystemPath + path + "/memory.current",
+           VirtualFilesystemPath + path + "/memory.stat"
+
+}
+
 
 func getNetPath(pid string) string {
 
