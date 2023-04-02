@@ -373,8 +373,8 @@ func main () {
         case "cpu" :
             log.Print("Starting to get CPU data")
             res := scraper.getCpuData()
-            pertRes := transCpuUnit(res[1])
-            printResult(name, "CPU", transCpuUnit(res[0]), pertRes, percentile)
+            pertRes := transCpuUnitV2(res[1])
+            printResult(name, "CPU", transCpuUnitV2(res[0]), pertRes, percentile)
 
             if scraper.out[:4] == "api:" {
                 log.Println("Calling API!")
@@ -409,8 +409,8 @@ func main () {
             log.Print("Starting to get all metrics: ")
             cpuRes, memRes, netRes := scraper.getAllData(netIface)
 
-            cpuPertRes := transCpuUnit(cpuRes[1])
-            printResult(name, "CPU", transCpuUnit(cpuRes[0]), cpuPertRes, percentile)
+            cpuPertRes := transCpuUnitV2(cpuRes[1])
+            printResult(name, "CPU", transCpuUnitV2(cpuRes[0]), cpuPertRes, percentile)
 
             memPertRes := transMemoryUnit(memRes[1])
             printResult(name, "RAM", transMemoryUnit(memRes[0]), memPertRes, percentile)

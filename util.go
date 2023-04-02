@@ -77,6 +77,10 @@ func transCpuUnit(cpu float64) string {
     return strconv.Itoa(int(math.Round(cpu/1000)))+"m"
 }
 
+func transCpuUnitV2(cpu float64) string {
+    return strconv.Itoa(int(math.Round(cpu)))+"m"
+}
+
 func transMemoryUnit(ram float64) string {
     return strconv.Itoa(int(math.Round(ram/1024/1024)))+"Mi"
 }
