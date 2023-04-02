@@ -281,8 +281,8 @@ func getIfaceIndex(path string, iface string) int {
 
 func (s Scraper) getAllData(iface string) ([]float64, []float64, []float64) {
     //get path of container
-    cpu_path := getCpuPath(s.pid)
-    usage_path, stats_path := getMemPath(s.pid)
+    cpu_path := getCpuPathV2(s.pid)
+    usage_path, stats_path := getMemPathV2(s.pid)
     net_path := getNetPath(s.pid)
 
     var cpu_outputs, ig_outputs, eg_outputs []string

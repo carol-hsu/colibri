@@ -106,7 +106,7 @@ func getMemPathV2(pid string) (string, string) {
 
 
 func getNetPath(pid string) string {
-
+    //cgroup v1 and v2 use the same path for network numbers
     return strings.Replace(NetMetricsPath, "{pid}", pid, 1)
 
 }
