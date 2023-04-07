@@ -1,4 +1,4 @@
-# Colibri: Fine-grained Metrics Gleaner
+# Colibri: Fine-grained Resource Profiler for MEC workload
 
 This tool helps you to get the metrics of resource utilization of a specific container in finer-granularity, in millisecond scale.
 We do so by getting numbers from the statistics on kernel: through reading the virtual files in `/proc` and `/sys/fs/cgroup`.
@@ -35,7 +35,7 @@ There are four dynamic input parameters as following:
 This parameter is used to differenciate the containers in a single Pod.
 - `pid`: The process id of the container, must specifying the correct one so to get the metrics you want.
 - `mtype`: The types of metric for collection, `cpu`, `mem`, `net` or `all`, `all` will run all three metric types. By default is `cpu`. 
-- `freq`: The frequency of getting numbers. The unit is millisecond. By default is `5`. 
+- `span`: The timespan/sampling interval of getting numbers. The unit is millisecond. By default is `5`. 
 - `iter`: The iterations of getting numbers. By default is `2000`. 
 - `out`: The prefix of output files for raw metircs storage; or API unique ID for storing the analytic results.
 Currently we only support either of them. Must added an another prefix "file:" or "api:" to indicate what kind of special output
@@ -68,7 +68,7 @@ While the mounting points on container is hardcoded in the program, be awared to
 Based on previous sections, you can run Colibri job with the carefully configured command.
 
 ```
-$ docker run -v /proc:/test/proc -v /sys/fs/cgroup:/tmp/cgroup -v /my-colibri/log/:/output colibri:latest colibri --pid 1234 --mtype net --freq 10 --iter 24000 --out yoman --pert 98
+$ docker run -v /proc:/test/proc -v /sys/fs/cgroup:/tmp/cgroup -v /my-colibri/log/:/output colibri:latest colibri --pid 1234 --mtype net --span 10 --iter 24000 --out yoman --pert 98
 ```
 
 ### Running with Kubernetes
