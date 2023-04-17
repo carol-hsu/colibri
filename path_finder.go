@@ -42,7 +42,12 @@ func getCgroupMetricPath(cgroupPath string, keyword string) string {
         fmt.Printf("Error: %v\n", err)
     } else if len(keyword) == 0 {
     // v2: return the first line, since it is the only line
-        return strings.TrimSpace(string(content))[10:]
+    // remove all /../ relative path
+        path = strings.Split(string(content), ":")[2]
+        for strings.HasPrefix(path, "/..") {
+            path = path[2:]
+        }
+        return path
 
     } else {
         for _, path := range strings.Split(string(content), "\n") {

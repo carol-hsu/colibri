@@ -28,9 +28,9 @@ type Scraper struct {
     pid string
     // The postfix name of output file
     out string
-    // The s.abbing frequency in millisecond
+    // The metric scraping timespan in millisecond
     ms int
-    // The s.abbing iterates
+    // The metric scraping #iteration
     iter int
     // The percentile for output
     pert float64
@@ -333,7 +333,7 @@ func main () {
     flag.StringVar(&name, "name", "birdy", "The name of this work to indicate for standard output. (default: birdy)")
     flag.StringVar(&metricType, "mtype", "cpu", "What metric to s.t: cpu/mem/net/all. (default: cpu)")
     flag.StringVar(&pid, "pid", "0", "The process ID of the container")
-    flag.IntVar(&intervalMsec, "freq", 5, "The scraping interval in millisecond. (default: 5)")
+    flag.IntVar(&intervalMsec, "span", 5, "The scraping interval/timespan in millisecond. (default: 5)")
     flag.IntVar(&iterateNum, "iter", 2000, "The scraping numbers. (default: 2000)")
     flag.Float64Var(&percentile, "pert", 95, "The percentile value for analytics. (default: 95)")
     flag.StringVar(&outputName, "out", "none", "Output file or API unique ID for storing the metrics")

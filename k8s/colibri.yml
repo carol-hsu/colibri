@@ -38,7 +38,7 @@ spec:
       - name: get-all-metrics
         image: colibri:latest
         imagePullPolicy: Never
-        command: ["colibri", "--pid", "$(PID)", "--out", "$(OUTPUT)", "--freq", "10", "--mtype", "all"]
+        command: ["colibri", "--pid", "$(PID)", "--out", "$(OUTPUT)", "--span", "10", "--mtype", "all"]
         env:
         - name: PID
           value: "APP_PID"
