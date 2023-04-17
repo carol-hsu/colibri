@@ -74,7 +74,7 @@ func getCpuPathV2(pid string) string {
     if path == "" {
         log.Fatal("Error: (cgroup v2) failed to find the path of CPU data\n")
     }
-
+    log.Println(VirtualFilesystemPath + path + "/cpu.stat")
     return VirtualFilesystemPath + path + "/cpu.stat"
 }
 
