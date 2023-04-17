@@ -207,7 +207,7 @@ func getCpuValue(path string, idx int) string {
 
     stats, err  := ioutil.ReadFile(path)
     if err != nil {
-        log.Print("Cannot read statistic file of cpu.")
+        log.Print("Cannot read statistic file of cpu: ", err)
         return ""
     }
 
@@ -218,7 +218,7 @@ func getMemoryValue(usage_path string, stats_path string, idx int) float64 {
 
     usage, err  := ioutil.ReadFile(usage_path)
     if err != nil {
-        log.Print("Cannot read usage file of memory.")
+        log.Print("Cannot read usage file of memory: ", err)
         return -1
     }
 
@@ -226,7 +226,7 @@ func getMemoryValue(usage_path string, stats_path string, idx int) float64 {
 
     stats, err  := ioutil.ReadFile(stats_path)
     if err != nil {
-        log.Print("Cannot read statistic file of memory.")
+        log.Print("Cannot read statistic file of memory: ", err)
         return -1
     }
 
@@ -237,7 +237,7 @@ func getUsageIndex(path string) int {
 
     stats, err  := ioutil.ReadFile(path)
     if err != nil {
-        log.Print("Cannot read statistic file of cpu.")
+        log.Print("Cannot read statistic file of cpu: ", err)
         return -1
     }
 
@@ -249,7 +249,7 @@ func getInactiveFileIndex(path string) int {
 
     stats, err  := ioutil.ReadFile(path)
     if err != nil {
-        log.Print("Cannot read statistic file of memory.")
+        log.Print("Cannot read statistic file of memory: ", err)
         return -1
     }
 

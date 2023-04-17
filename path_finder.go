@@ -43,9 +43,9 @@ func getCgroupMetricPath(cgroupPath string, keyword string) string {
     } else if len(keyword) == 0 {
     // v2: return the first line, since it is the only line
     // remove all /../ relative path
-        path = strings.Split(string(content), ":")[2]
+        path := strings.TrimSpace(strings.Split(string(content), ":")[2])
         for strings.HasPrefix(path, "/..") {
-            path = path[2:]
+            path = path[3:]
         }
         return path
 
@@ -79,7 +79,7 @@ func getCpuPathV2(pid string) string {
     if path == "" {
         log.Fatal("Error: (cgroup v2) failed to find the path of CPU data\n")
     }
-    log.Println(VirtualFilesystemPath + path + "/cpu.stat")
+
     return VirtualFilesystemPath + path + "/cpu.stat"
 }
 
