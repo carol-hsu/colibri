@@ -15,7 +15,6 @@
 package main
 
 import (
-    "fmt"
     "strings"
     "log"
     "io/ioutil"
@@ -39,7 +38,7 @@ func getCgroupMetricPath(cgroupPath string, keyword string) string {
     content, err := ioutil.ReadFile(cgroupPath)
 
     if err != nil {
-        fmt.Printf("Error: %v\n", err)
+        log.Print("Cannot read cgroup metric path: ", err)
     } else if len(keyword) == 0 {
     // v2: return the first line, since it is the only line
     // remove all /../ relative path
