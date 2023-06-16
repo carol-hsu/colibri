@@ -84,5 +84,3 @@ func sendMetric(value []byte, rid string) {
     }
     log.Println(string([]byte(body)))
 }
-
-
