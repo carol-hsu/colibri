@@ -19,8 +19,9 @@ import (
     "flag"
     "fmt"
     "log"
-    "io/ioutil"
+    "os"
     "strings"
+    "strconv"
 )
 
 type Scraper struct {
@@ -44,7 +45,8 @@ func (s Scraper) getCpuData() []float64 {
     var stats_outputs = []string{}
 
     for i:=0; i<s.iter; i++ {
-        stats, err  := ioutil.ReadFile(cpu_data_fullpath)
+        t0 := time.Now()
+        stats, err  := os.ReadFile(cpu_data_fullpath)
         if err != nil {
             if i == 0 {
             // nothing existed in output, then forcefully stop
@@ -56,6 +58,8 @@ func (s Scraper) getCpuData() []float64 {
         }
         stats_outputs = append(stats_outputs, string(stats))
         time.Sleep(time.Duration(s.ms) * time.Millisecond)
+        dura := time.Now().Sub(t0)
+        fmt.Println(dura.Nanoseconds())
     }
 
     log.Print("CPU metrics collection is finished. Start to post-process data ...")
@@ -76,7 +80,6 @@ func (s Scraper) getCpuData() []float64 {
             f.WriteString(outputs[i]+"\n")
         }
     }
-
     return countRate(outputs, s.ms, s.pert)
 }
 
@@ -88,7 +91,7 @@ func (s Scraper) getMemoryData() []float64 {
 
     for i:=0; i < s.iter; i++ {
 
-        usage, err  := ioutil.ReadFile(usage_file)
+        usage, err  := os.ReadFile(usage_file)
         if err != nil {
             if i == 0 {
             // nothing existed in output, then forcefully stop
@@ -100,7 +103,7 @@ func (s Scraper) getMemoryData() []float64 {
         }
         usage_outputs = append(usage_outputs, strings.TrimSpace(string(usage)))
 
-        stats, err  := ioutil.ReadFile(stats_file)
+        stats, err  := os.ReadFile(stats_file)
         if err != nil {
             if i == 0 {
             // nothing existed in output, then forcefully stop
@@ -147,7 +150,7 @@ func (s Scraper) getNetworkData(iface string) []float64 {
     path := getNetPath(s.pid)
 
     for i := 0; i < s.iter; i++ {
-        net_stat, err := ioutil.ReadFile(path)
+        net_stat, err := os.ReadFile(path)
 
         if err != nil {
             if i == 0 {
@@ -205,7 +208,7 @@ func (s Scraper) getNetworkData(iface string) []float64 {
 
 func getCpuValue(path string, idx int) string {
 
-    stats, err  := ioutil.ReadFile(path)
+    stats, err  := os.ReadFile(path)
     if err != nil {
         log.Print("Cannot read statistic file of cpu: ", err)
         return ""
@@ -216,7 +219,7 @@ func getCpuValue(path string, idx int) string {
 
 func getMemoryValue(usage_path string, stats_path string, idx int) float64 {
 
-    usage, err  := ioutil.ReadFile(usage_path)
+    usage, err  := os.ReadFile(usage_path)
     if err != nil {
         log.Print("Cannot read usage file of memory: ", err)
         return -1
@@ -224,7 +227,7 @@ func getMemoryValue(usage_path string, stats_path string, idx int) float64 {
 
     usage_output := strings.TrimSpace(string(usage))
 
-    stats, err  := ioutil.ReadFile(stats_path)
+    stats, err  := os.ReadFile(stats_path)
     if err != nil {
         log.Print("Cannot read statistic file of memory: ", err)
         return -1
@@ -235,7 +238,7 @@ func getMemoryValue(usage_path string, stats_path string, idx int) float64 {
 
 func getUsageIndex(path string) int {
 
-    stats, err  := ioutil.ReadFile(path)
+    stats, err  := os.ReadFile(path)
     if err != nil {
         log.Print("Cannot read statistic file of cpu: ", err)
         return -1
@@ -247,7 +250,7 @@ func getUsageIndex(path string) int {
 
 func getInactiveFileIndex(path string) int {
 
-    stats, err  := ioutil.ReadFile(path)
+    stats, err  := os.ReadFile(path)
     if err != nil {
         log.Print("Cannot read statistic file of memory: ", err)
         return -1
@@ -258,7 +261,7 @@ func getInactiveFileIndex(path string) int {
 
 func getNetworkValue(path string, idx int) (string, string) {
 
-    net_stat, err := ioutil.ReadFile(path)
+    net_stat, err := os.ReadFile(path)
     if err != nil {
         log.Print("Cannot read statistic file of network.")
         return "", ""
@@ -270,7 +273,7 @@ func getNetworkValue(path string, idx int) (string, string) {
 
 func getIfaceIndex(path string, iface string) int {
 
-    stats, err  := ioutil.ReadFile(path)
+    stats, err  := os.ReadFile(path)
     if err != nil {
         log.Print("Cannot read statistic file of network.")
         return -1
@@ -285,7 +288,7 @@ func (s Scraper) getAllData(iface string) ([]float64, []float64, []float64) {
     usage_path, stats_path := getMemPathV2(s.pid)
     net_path := getNetPath(s.pid)
 
-    var cpu_outputs, ig_outputs, eg_outputs []string
+    var cpu_outputs, ig_outputs, eg_outputs, time_outputs []string
     var mem_outputs = []float64{}
 
     //get index for collecting data from memory statistic file
@@ -295,6 +298,7 @@ func (s Scraper) getAllData(iface string) ([]float64, []float64, []float64) {
 
     //start metrics scraping period
     for i:=0; i < s.iter; i++ {
+        t0 := time.Now()
         cpu_v := getCpuValue(cpu_path, cpu_idx)
         mem_v := getMemoryValue(usage_path, stats_path, mem_idx)
         ig_bw, eg_bw := getNetworkValue(net_path, net_idx)
@@ -310,6 +314,8 @@ func (s Scraper) getAllData(iface string) ([]float64, []float64, []float64) {
         eg_outputs = append(eg_outputs, eg_bw)
 
         time.Sleep(time.Duration(s.ms) * time.Millisecond)
+        dura := time.Now().Sub(t0)
+        time_outputs = append(time_outputs, strconv.Itoa(int(dura.Nanoseconds())))
     }
 
     //if outputName == none, then don't write out, just print analysis result
@@ -328,11 +334,15 @@ func (s Scraper) getAllData(iface string) ([]float64, []float64, []float64) {
         eg_f := createOutputFile(file_prefix + "ms_eg_bytes")
         defer eg_f.Close()
 
+        t_f := createOutputFile(file_prefix + "ms_intervals")
+        defer t_f.Close()
+
         for i := 0; i < len(cpu_outputs); i++ {
             cpu_f.WriteString(cpu_outputs[i]+"\n")
             mem_f.WriteString(fmt.Sprintf("%.0f\n", mem_outputs[i]))
             ig_f.WriteString(ig_outputs[i]+"\n")
             eg_f.WriteString(eg_outputs[i]+"\n")
+            t_f.WriteString(time_outputs[i]+"\n")
         }
     }
 

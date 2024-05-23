@@ -2,6 +2,7 @@
 
 This tool helps you to get the metrics of resource utilization of a specific container in finer-granularity, in millisecond scale.
 We do so by getting numbers from the statistics on kernel: through reading the virtual files in `/proc` and `/sys/fs/cgroup`.
+Colibri supports both cgroup v1 and v2.
 
 Before running this tool, you will need to know the process id of the container on your host.
 
@@ -18,10 +19,12 @@ Then, we can get the process id `9189` is for the container.
 
 ## Build the image
 
-You can build image with the root Dockerfile at the root directory.
+You can build image with the root Dockerfile at the root directory. 
+It is necessary to indicate the version of cgroup of your system by the parameter `CGROUP_VERSION`.
 
 ```
-$ docker build -t colibri .
+// Building with a image name "colibri" and setting to build for cgroup v2 using the specific files.
+$ docker build -t colibri --build-arg CGROUP_VERSION=2 .
 ```
 
 ## Run Colibri job container

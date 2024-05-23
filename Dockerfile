@@ -12,22 +12,36 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+ARG CGROUP_VERSION=2
+
 FROM golang:1.18-alpine as builder
 ARG VERSION=0.1
 ENV GO111MODULE=on
 ENV CGO_ENABLED=0
 ENV GOOS=linux
 ENV GOARCH=amd64
+ARG CGROUP_VERSION
 
 # build
 WORKDIR /coli-build/
 COPY . .
 RUN GO111MODULE=on go mod download
-RUN go build -o colibri scraper.go request.go util.go path_finder.go
-RUN go build -o colibri_v2 scraper_v2.go request.go util.go path_finder.go
+
+RUN if [ "$CGROUP_VERSION" = "2" ] ; then \
+        go build -o colibri-v2 scraperv2.go request.go util.go pathfinder.go ; \
+    elif [ "$CGROUP_VERSION" = "1" ] ; then \
+        go build -o colibri scraper.go request.go util.go pathfinder.go ; \
+    else \
+        echo "Please indicate proper CGROUP_VERSION based on your OS." ; \
+    fi
 
 # runtime image
 FROM gcr.io/google_containers/ubuntu-slim:0.14
-COPY --from=builder /coli-build/colibri /usr/bin/colibri
-COPY --from=builder /coli-build/colibri_v2 /usr/bin/colibri_v2
-CMD ["colibri_v2"]
+ARG CGROUP_VERSION
+
+COPY --from=builder /coli-build/colibri* /usr/bin/
+CMD if [ "$CGROUP_VERSION" = "2" ] ; then \
+        colibri-v2; \
+    else \
+        colibri; \
+    fi
