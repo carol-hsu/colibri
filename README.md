@@ -2,7 +2,7 @@
 
 This tool helps you to get the metrics of resource utilization of a specific container in finer-granularity, in millisecond scale.
 We do so by getting numbers from the statistics on kernel: through reading the virtual files in `/proc` and `/sys/fs/cgroup`.
-Colibri supports both cgroup v1 and v2.
+Colibri supports both cgroup v1 and v2. **Proved run with Ubuntu 24.04 and Kubernetes v1.31.1**.
 
 Before running this tool, you will need to know the process id of the container on your host.
 
@@ -62,8 +62,13 @@ If these information is not correct, Colibri API server will block this process.
 The virual file system of cgroups are the significant service in Linux Kernel, to avoid violating the container environment, we prevent to overwrite the them on container.
 While the mounting points on container is hardcoded in the program, be awared to mount following directory to the exact pathes (on container).
 
-- `/proc` to `/tmp/proc`
-- `/sys/fs/cgroup` to `/tmp/cgroup`
+- The process directory for container ID/directory lookup: `/proc` to `/tmp/proc`
+- The prefix directory tree for container metrics: by default, mount `/sys/fs/cgroup/kubepods.slice` to `/tmp/cgroup`.
+In fact, the subdirectory of a container in cgroupfs is **NOT** in a fixed style in K8s. 
+This can be varied by the versions of cgroup and K8s, and the [QoS](https://kubernetes.io/docs/tasks/configure-pod-container/quality-service-pod/) of the container. 
+In cgroup v2 with K8s 1.31, 
+    - If container is only set resource requests: change mounting point to `/sys/fs/cgroup/kubepods.slice/kubepods-burstable.slice`  
+    - If container isn't set any resource tag: use `/sys/fs/cgroup/kubepods.slice/kubepods-besteffort.slice`
 - output file directory to `/output/`
 
 ### The example command

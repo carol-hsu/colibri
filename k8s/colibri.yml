@@ -28,7 +28,7 @@ spec:
           type: Directory
       - name: cgroup-dir
         hostPath:
-          path: /sys/fs/cgroup
+          path: /sys/fs/cgroup/kubepods.slice
           type: Directory
       - name: output
         hostPath:
@@ -38,7 +38,8 @@ spec:
       - name: get-all-metrics
         image: colibri:latest
         imagePullPolicy: Never
-        command: ["colibri", "--pid", "$(PID)", "--out", "$(OUTPUT)", "--span", "10", "--mtype", "all"]
+        # for running on cgroup v2           
+        command: ["colibri-v2", "--pid", "$(PID)", "--out", "$(OUTPUT)", "--span", "10", "--mtype", "all"]
         env:
         - name: PID
           value: "APP_PID"
@@ -51,4 +52,3 @@ spec:
           name: cgroup-dir
         - mountPath: /output
           name: output
-        # example of a specific metrics grabber
