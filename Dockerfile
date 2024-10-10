@@ -14,7 +14,7 @@
 
 ARG CGROUP_VERSION=2
 
-FROM golang:1.18-alpine as builder
+FROM golang:1.18-alpine AS builder
 ARG VERSION=0.1
 ENV GO111MODULE=on
 ENV CGO_ENABLED=0
@@ -41,7 +41,7 @@ ARG CGROUP_VERSION
 
 COPY --from=builder /coli-build/colibri* /usr/bin/
 CMD if [ "$CGROUP_VERSION" = "2" ] ; then \
-        colibri-v2; \
+        [colibri-v2]; \
     else \
-        colibri; \
+        [colibri]; \
     fi
