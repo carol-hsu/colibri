@@ -19,6 +19,16 @@ Then, we can get the process id `9189` is for the container.
 
 ## Build the image
 
+<details>
+<summary>To verify the cgroup version of your server:</summary>
+Checking the system's mount point list to find out which version you are using.
+For example, this result below shows v2.
+```
+$ sudo mount -l | grep "cgroup"
+cgroup2 on /sys/fs/cgroup type cgroup2 (rw,nosuid,nodev,noexec,relatime)
+```
+</details>
+
 You can build image with the root Dockerfile at the root directory. 
 It is necessary to indicate the version of cgroup of your system by the parameter `CGROUP_VERSION`.
 
