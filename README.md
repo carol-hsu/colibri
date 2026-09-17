@@ -4,18 +4,6 @@ This tool helps you to get the metrics of resource utilization of a specific con
 We do so by getting numbers from the statistics on kernel: through reading the virtual files in `/proc` and `/sys/fs/cgroup`.
 Colibri supports both cgroup v1 and v2. **Proved run with Ubuntu 24.04 and Kubernetes v1.31.1**.
 
-Before running this tool, you will need to know the process id of the container on your host.
-
-One method is refering the entry command of the container. 
-For example, I want to get the metrics of the container running Prometheus, and I know its entry command including `prom`.
-
-```
-$ ps aux | grep "prom"
-nobody    9189  0.6  0.7 2060936 237084 ?      Ssl  May24  10:40 /bin/prometheus --config.file=/prometheus-cfg/prometheus.yml --storage.tsdb.path=/data
-myaccount    22950  0.0  0.0  14428  1024 pts/0    S+   17:30   0:00 grep --color=auto prom
-```
-
-Then, we can get the process id `9189` is for the container.
 
 ## Build the image
 
@@ -46,7 +34,7 @@ After building the image, to run this job-like container, please refer to follow
 There are four dynamic input parameters as following:
 - `name`: A unique name for standard metrics output of the specific container. 
 This parameter is used to differenciate the containers in a single Pod.
-- `pid`: The process id of the container, must specifying the correct one so to get the metrics you want.
+- `pid`: The process ID of the container, must specifying the correct one so to get the metrics you want.
 - `mtype`: The types of metric for collection, `cpu`, `mem`, `net` or `all`, `all` will run all three metric types. By default is `cpu`. 
 - `span`: The timespan/sampling interval of getting numbers. The unit is millisecond. By default is `5`. 
 - `iter`: The iterations of getting numbers. By default is `2000`. 
@@ -66,6 +54,34 @@ If these information is not correct, Colibri API server will block this process.
 
 - `iface`: The network interface of the container which you want to get metrics. Only used when `mtype = net`. By default is `eth0`.
 - `pert`: The percentile of the metrics shown in standard output. By default is `95`.
+
+#### How to get the process ID of your container
+
+Before running this tool, you will need to know the process ID of the container on your host.
+
+One method is refering the entry command of the container. 
+For example, I want to get the metrics of the container running Prometheus, and I know its entry command including `prom`.
+
+```
+$ ps aux | grep "prom"
+nobody    9189  0.6  0.7 2060936 237084 ?      Ssl  May24  10:40 /bin/prometheus --config.file=/prometheus-cfg/prometheus.yml --storage.tsdb.path=/data
+myaccount    22950  0.0  0.0  14428  1024 pts/0    S+   17:30   0:00 grep --color=auto prom
+```
+
+Then, we can get the process ID `9189` is for the container.
+
+Or, if you are using Docker to run the containers, you can use `docker` command to find the process ID efficiently.
+
+```
+// add argument with the specific container name or container ID
+$ docker top eaf165466871
+UID             PID             PPID            C               STIME           TTY             TIME            CMD
+root            94928           94905           0               13:32           pts/0           00:00:00        /bin/bash
+
+```
+
+That's it, the `94928` in this case; not PPID, which is for the parent process.
+
 
 ### Mounting points
 
