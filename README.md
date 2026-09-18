@@ -27,40 +27,39 @@ $ docker build -t colibri --build-arg CGROUP_VERSION=2 .
 
 ## Run Colibri job container
 
-After building the image, to run this job-like container, please refer to following key points:
+After building the image, to run this job-like container, please refer to the key points below:
 
 ### Parameters
 
-There are four dynamic input parameters as following:
-- `name`: A unique name for standard metrics output of the specific container. 
-This parameter is used to differenciate the containers in a single Pod.
-- `pid`: The process ID of the container, must specifying the correct one so to get the metrics you want.
-- `mtype`: The types of metric for collection, `cpu`, `mem`, `net` or `all`, `all` will run all three metric types. By default is `cpu`. 
-- `span`: The timespan/sampling interval of getting numbers. The unit is millisecond. By default is `5`. 
-- `iter`: The iterations of getting numbers. By default is `2000`. 
-- `out`: The prefix of output files for raw metircs storage; or API unique ID for storing the analytic results.
-Currently we only support either of them. Must added an another prefix "file:" or "api:" to indicate what kind of special output
-you target for.
+There are eight dynamic input parameters as following:
 
-  By default it is `none`, there will be no output of raw metrics. 
+| Parameters | Description  | Format  | Default value |
+| ---------- | ------------ | ------- | ------------- |
+| `name`     | A unique name for the standard metrics output of the specific container. This parameter is used to differentiate the containers in a single Pod. Name it whatever you can recognize for the output      | String | — |
+| `pid`      | The process ID of the container. You must specify the correct one to get the metrics you want. [Some instructions](#how-to-get-the-process-id-of-the-container) are described below. | Integer | `0` |
+| `mtype`    | The type of metric to collect. There are three of them. `all` will collect all three metric types. | `cpu`, `mem`, `net`, or `all`| `cpu`|
+| `span`     | The timespan/sampling interval for getting metrics. The unit is milliseconds. | Integer (millisecondes) | `5` |
+| `iter`     | The number of iterations for getting metrics. | Integer | `2000` |
+| `out`      | The prefix of output files for raw metrics storage, or the API unique ID for storing the analytic results (for K8s integration). Currently, we only support either of them. You must add either the prefix `file:` or `api:` to indicate the type of output you want. | `none`, `file:<prefix_name>`, or `api:<UUID>` | `none` |
+| `iface`    | The network interface of the container from which you want to get metrics. Only used when `mtype` is `net` or `all`. | String | `eth0` |
+| `pert`     | The percentile of the metrics shown in standard output. | Integer (percentile) | `95` |
 
-  If the value is assigned to `file:/tmp/colibri/test`, there will come out files named `test_*` and be put at `/tmp/colibri`;
+#### More details and examples of the `out` parameter
 
-  If the value is assigned to `api:default.my-private-registry-866f6fd9b7-48wq7.1234`, 
-it is a uuid for sending analytics numbers to Colibri API server for storage.
-The value points to a container with process ID `1234`, 
-it is running in the Pod "my-private-registry-866f6fd9b7-48wq7" in "default" Namespace.
-If these information is not correct, Colibri API server will block this process.
+- `none`: There will be no output file of raw metrics. It will only show aggregate values (average and percentile) on container's STDOUT.
+- `file:your_log`: Files named `your_log_*` will be generated and put in the mounted output directory.
+- `api:default.my-private-registry-866f6fd9b7-48wq7.1234`: 
+A UUID for sending analytics numbers to the Colibri API server for storage. 
+The value points to a container with process ID `1234`, running in the Pod `my-private-registry-866f6fd9b7-48wq7` 
+in the `default` Namespace. If this information is not correct, the Colibri API server will block this process.
 
-- `iface`: The network interface of the container which you want to get metrics. Only used when `mtype = net`. By default is `eth0`.
-- `pert`: The percentile of the metrics shown in standard output. By default is `95`.
-
-#### How to get the process ID of your container
+#### How to get the process ID of the container
 
 Before running this tool, you will need to know the process ID of the container on your host.
 
-One method is refering the entry command of the container. 
-For example, I want to get the metrics of the container running Prometheus, and I know its entry command including `prom`.
+One method is to check the entry command of the container. 
+For example, I want to get the metrics of a container running [Prometheus](https://prometheus.io/), 
+and I know its entry command contains `prom`.
 
 ```
 $ ps aux | grep "prom"
@@ -68,24 +67,26 @@ nobody    9189  0.6  0.7 2060936 237084 ?      Ssl  May24  10:40 /bin/prometheus
 myaccount    22950  0.0  0.0  14428  1024 pts/0    S+   17:30   0:00 grep --color=auto prom
 ```
 
-Then, we can get the process ID `9189` is for the container.
+Then, we can see that process ID `9189` is for the container.
 
-Or, if you are using Docker to run the containers, you can use `docker` command to find the process ID efficiently.
+Or, if you are using Docker to run the containers, 
+you can use `docker` command to find the process ID efficiently.
 
 ```
 // add argument with the specific container name or container ID
 $ docker top eaf165466871
 UID             PID             PPID            C               STIME           TTY             TIME            CMD
 root            94928           94905           0               13:32           pts/0           00:00:00        /bin/bash
-
 ```
 
-That's it, the `94928` in this case; not PPID, which is for the parent process.
+That's it: `94928` in this case; not PPID, which is for the parent process.
 
 
 ### Mounting points
 
-The virual file system of cgroups are the significant service in Linux Kernel, to avoid violating the container environment, we prevent to overwrite the them on container.
+The virtual file system of cgroup is a significant service in Linux kernel. 
+To avoid violating the container environment, 
+we prevent to overwrite the them on container.
 While the mounting points on container is hardcoded in the program, be awared to mount following directory to the exact pathes (on container).
 
 - The process directory for container ID/directory lookup: `/proc` to `/tmp/proc`
@@ -102,10 +103,10 @@ In cgroup v2 with K8s 1.31,
 Based on previous sections, you can run Colibri job with the carefully configured command.
 
 ```
-$ docker run -v /proc:/test/proc -v /sys/fs/cgroup:/tmp/cgroup -v /my-colibri/log/:/output colibri:latest colibri --pid 1234 --mtype net --span 10 --iter 24000 --out yoman --pert 98
+$ docker run -v /proc:/tmp/proc -v /sys/fs/cgroup:/tmp/cgroup -v /my-colibri/log/:/output colibri:latest colibri --pid 1234 --mtype net --span 10 --iter 24000 --out yoman --pert 98
 ```
 
-### Running with Kubernetes
+### Working with Kubernetes
 
 We can also run our Colibri job through K8s, for getting the metrics on specific workers.
 
