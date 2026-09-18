@@ -97,7 +97,7 @@ be aware that following directories must be mounted to the exact pathes (on the 
 | Mount point | Description | Host path | Container path (don't change it) |
 | ----------- | ----------- | --------- | -------------------------------- |
 | The process directory | Looking up the metrics directory in the cgroupfs | `/proc` | `/tmp/proc` |
-| The directory tree prefix for container metrics | The absolute, leading path of cgroupfs. We combine this prefix path with the information from above mount point (from `/proc/<process_id>`) to get this metric files | vary by cgroup versions and K8s deployment configuration, see the details below | `/tmp/cgroup` |
+| The directory tree prefix for container metrics | The absolute, leading path of cgroupfs. We combine this prefix path with the information from above mount point (from `/proc/<pid>`) to get this metric files | vary by cgroup versions and K8s deployment configuration, see the details below | `/tmp/cgroup` |
 | Output directory | The location for publishing output files | Any path you prefer | `/output/` | 
 
 The container subdirectory in cgroupfs does **NOT** have a fixed structure, no matter in cgroup versions and K8s deployment.
