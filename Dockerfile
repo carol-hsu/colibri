@@ -14,7 +14,7 @@
 
 ARG CGROUP_VERSION=2
 
-FROM golang:1.18-alpine AS builder
+FROM golang:1.27-alpine AS builder
 ARG VERSION=0.1
 ENV GO111MODULE=on
 ENV CGO_ENABLED=0
@@ -28,9 +28,9 @@ COPY . .
 RUN GO111MODULE=on go mod download
 
 RUN if [ "$CGROUP_VERSION" = "2" ] ; then \
-        go build -o colibri-v2 scraperv2.go request.go util.go pathfinder.go ; \
+        go build -o colibri scraperv2.go ; \
     elif [ "$CGROUP_VERSION" = "1" ] ; then \
-        go build -o colibri scraper.go request.go util.go pathfinder.go ; \
+        go build -o colibri scraper.go ; \
     else \
         echo "Please indicate proper CGROUP_VERSION based on your OS." ; \
     fi
@@ -39,9 +39,5 @@ RUN if [ "$CGROUP_VERSION" = "2" ] ; then \
 FROM gcr.io/google_containers/ubuntu-slim:0.14
 ARG CGROUP_VERSION
 
-COPY --from=builder /coli-build/colibri* /usr/bin/
-CMD if [ "$CGROUP_VERSION" = "2" ] ; then \
-        colibri-v2; \
-    else \
-        colibri; \
-    fi
+COPY --from=builder /coli-build/colibri /usr/bin/
+ENTRYPOINT ["/usr/bin/colibri"]
