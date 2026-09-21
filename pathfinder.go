@@ -15,14 +15,9 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
-	"strconv"
 	"strings"
-	"sync"
-
-	"golang.org/x/sys/unix"
 )
 
 const (
@@ -37,43 +32,6 @@ const (
 	CpuDirectory = "cpu,cpuacct"
 	MemDirectory = "memory"
 )
-
-var (
-	cgroupFd     int = -1
-	prepOnce     sync.Once
-	prepErr      error
-	resolveFlags uint64
-)
-
-func openCpuFileV2(pid string) (*os.File, error) {
-	// referring to the implementation of opencontainers/runc/libcontainer/cgroups/file.go
-
-	path := getCpuPathV2(pid)
-	mode := os.FileMode(0)
-
-	trimPath := strings.TrimPrefix(path, CgroupFilesystemPath)
-	if prepareOpenat2() != nil {
-		log.Print("Warn: prepare for Openat2 error: ", prepErr)
-		return nil, prepErr
-	}
-	fd, err := unix.Openat2(cgroupFd, trimPath,
-		&unix.OpenHow{
-			Resolve: resolveFlags,
-			Flags:   uint64(unix.O_RDONLY) | unix.O_CLOEXEC,
-			Mode:    uint64(mode),
-		})
-	if err != nil {
-		err = &os.PathError{Op: "openat2", Path: path, Err: err}
-		fdStr := strconv.Itoa(cgroupFd)
-		fdDest, _ := os.Readlink("/tmp/proc/self/fd/" + fdStr)
-		if fdDest != CgroupFilesystemDir {
-			err = fmt.Errorf("cgroupFd %s unexpectedly opened to %s != %s: %w",
-				fdStr, fdDest, CgroupFilesystemDir, err)
-		}
-		return nil, err
-	}
-	return os.NewFile(uintptr(fd), path), nil
-}
 
 func getCgroupMetricPath(cgroupPath string, keyword string) string {
 
