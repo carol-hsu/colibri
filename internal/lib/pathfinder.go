@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package lib
 
 import (
 	"log"
@@ -59,7 +59,7 @@ func getCgroupMetricPath(cgroupPath string, keyword string) string {
 
 }
 
-func getCpuPath(pid string) string {
+func GetCpuPath(pid string) string {
 
 	path := getCgroupMetricPath(strings.Replace(PidCgroupPath, "{pid}", pid, 1), CpuDirectory)
 
@@ -70,7 +70,7 @@ func getCpuPath(pid string) string {
 	return CgroupFilesystemPath + CpuDirectory + path + "/cpuacct.usage"
 }
 
-func getCpuPathV2(pid string) string {
+func GetCpuPathV2(pid string) string {
 
 	path := getCgroupMetricPath(strings.Replace(PidCgroupPath, "{pid}", pid, 1), "")
 
@@ -81,7 +81,7 @@ func getCpuPathV2(pid string) string {
 	return CgroupFilesystemDir + path + "/cpu.stat"
 }
 
-func getMemPath(pid string) (string, string) {
+func GetMemPath(pid string) (string, string) {
 
 	path := getCgroupMetricPath(strings.Replace(PidCgroupPath, "{pid}", pid, 1), MemDirectory)
 
@@ -94,7 +94,7 @@ func getMemPath(pid string) (string, string) {
 
 }
 
-func getMemPathV2(pid string) (string, string) {
+func GetMemPathV2(pid string) (string, string) {
 
 	path := getCgroupMetricPath(strings.Replace(PidCgroupPath, "{pid}", pid, 1), "")
 
@@ -107,7 +107,7 @@ func getMemPathV2(pid string) (string, string) {
 
 }
 
-func getNetPath(pid string) string {
+func GetNetPath(pid string) string {
 	//cgroup v1 and v2 use the same path for network numbers
 	return strings.Replace(NetMetricsPath, "{pid}", pid, 1)
 

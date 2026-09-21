@@ -12,7 +12,7 @@
 // See the License for the specific language s.verning permissions and
 // limitations under the License.
 
-package main
+package lib
 
 import (
     "bytes"
@@ -48,7 +48,7 @@ func createHttpClient() *http.Client {
     return client
 }
 
-func sendMetric(value []byte, rid string) {
+func SendMetric(value []byte, rid string) {
 
     //create bearer with token
     token, err := ioutil.ReadFile(TokenFile)

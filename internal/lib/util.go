@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package lib
 
 import (
     "fmt"
@@ -24,13 +24,13 @@ import (
     "github.com/montanaflynn/stats"
 )
 
-func stringToFloat(str string) float64 {
+func StringToFloat(str string) float64 {
     f, _ := strconv.ParseFloat(str, 64)
     return f
 }
 
 // to find which row of data contains the keyword, which would be the information we want
-func findIndex(data string, keyword string) int {
+func FindIndex(data string, keyword string) int {
     for i, d := range strings.Split(data, "\n") {
         if strings.Contains(d, keyword) {
             return i
@@ -40,7 +40,7 @@ func findIndex(data string, keyword string) int {
 }
 
 //no help to close the file
-func createOutputFile(filename string) *os.File {
+func CreateOutputFile(filename string) *os.File {
 
     f, err := os.Create(filename)
     if err != nil {
@@ -50,13 +50,13 @@ func createOutputFile(filename string) *os.File {
     return f
 }
 
-func countRate(data []string, interval int, percent float64) []float64 {
+func CountRate(data []string, interval int, percent float64) []float64 {
 
     res := make([]float64, 2)
     float_data := make([]float64, len(data)-1)
 
     for i := 0; i < len(data)-1; i++ {
-        float_data[i] = (stringToFloat(data[i+1]) - stringToFloat(data[i])) / float64(interval)
+        float_data[i] = (StringToFloat(data[i+1]) - StringToFloat(data[i])) / float64(interval)
     }
 
     res[0], _ = stats.Mean(float_data)
@@ -65,7 +65,7 @@ func countRate(data []string, interval int, percent float64) []float64 {
     return res
 }
 
-func countValue(data []float64, percent float64) []float64 {
+func CountValue(data []float64, percent float64) []float64 {
 
     res := make([]float64, 2)
     res[0], _ = stats.Mean(data)
@@ -77,15 +77,15 @@ func transCpuUnit(cpu float64) string {
     return strconv.Itoa(int(math.Round(cpu/1000)))+"m"
 }
 
-func transCpuUnitV2(cpu float64) string {
+func TransCpuUnitV2(cpu float64) string {
     return strconv.Itoa(int(math.Round(cpu)))+"m"
 }
 
-func transMemoryUnit(ram float64) string {
+func TransMemoryUnit(ram float64) string {
     return strconv.Itoa(int(math.Round(ram/1024/1024)))+"Mi"
 }
 
-func transBandwidthUnit(bw float64) string {
+func TransBandwidthUnit(bw float64) string {
     // change X/ms to Y/s, Y's minimum unit is k
     // check if the value fit for k or M
     if (bw*1000/1024) < 1 {
@@ -101,7 +101,7 @@ func transBandwidthUnit(bw float64) string {
     }
 }
 
-func printResult(workName string, metricName string, avgValue string, pertValue string, pert float64) {
+func PrintResult(workName string, metricName string, avgValue string, pertValue string, pert float64) {
 
     log.Printf("%s -- %s Avg: %s, %.2f-Percentile: %s\n", workName, metricName, avgValue, pert, pertValue)
 

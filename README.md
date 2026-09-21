@@ -26,7 +26,7 @@ It is necessary to indicate the cgroup version of your system using the paramete
 $ docker build -t colibri --build-arg CGROUP_VERSION=2 .
 ```
 
-## Run Colibri Job container
+## Run the Colibri Job container
 
 After building the image, to run this job-like container, please refer to the key points below:
 
@@ -139,3 +139,7 @@ You can check `./k8s/colibri-api-callback.yml`.
 We will run a job with proper permission attached to it.
 The other job configurations are similar to the standalone version. Just be careful the `--out` flag.
 
+
+## Run the Colibri Job simplely as a Go program
+
+I develop this local run compatibility is for fast verification.

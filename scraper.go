@@ -346,6 +346,7 @@ func main () {
         log.Print("Monitoring process cannot be processed with intervalMsec less and equal 0.")
         return
     }
+
     scraper := Scraper{pid, outputName, intervalMsec, iterateNum, percentile}
 
     //getting numbers by type
