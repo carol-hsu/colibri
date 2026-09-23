@@ -39,7 +39,7 @@ func FindIndex(data string, keyword string) int {
     return -1
 }
 
-//no help to close the file
+//no help to close the file, TODO: remove this function?
 func CreateOutputFile(filename string) *os.File {
 
     f, err := os.Create(filename)

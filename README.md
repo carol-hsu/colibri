@@ -98,7 +98,7 @@ be aware that following directories must be mounted to the exact pathes (on the 
 | ----------- | ----------- | --------- | -------------------------------- |
 | The process directory | Looking up the metrics directory in the cgroupfs | `/proc` | `/tmp/proc` |
 | The directory tree prefix for container metrics | The absolute, leading path of cgroupfs. We combine this prefix path with the information from above mount point (from `/proc/<pid>`) to get this metric files | vary by cgroup versions and K8s deployment configuration, see the details below | `/tmp/cgroup` |
-| Output directory | The location for publishing output files | Any path you prefer | `/output/` | 
+| Output directory | The location for publishing output files | Any path you prefer | `/log` |
 
 The container subdirectory in cgroupfs does **NOT** have a fixed structure, no matter in cgroup versions and K8s deployment.
 In K8s, it is impacted by the [QoS](https://kubernetes.io/docs/tasks/configure-pod-container/quality-service-pod/) 
@@ -113,7 +113,7 @@ configuration of the container. Some mount point in cgroup v2 with K8s 1.31 are 
 Based on previous sections, you can run the Colibri Job with the carefully configured command.
 
 ```
-$ docker run -v /proc:/tmp/proc -v /sys/fs/cgroup/system.slice:/tmp/cgroup -v /my-colibri/log/:/output colibri:latest colibri --pid 1234 --mtype net --span 20 --iter 24000 --out network_20_4min --pert 98
+$ docker run -v /proc:/tmp/proc -v /sys/fs/cgroup/system.slice:/tmp/cgroup -v /my-colibri/log/:/log colibri:latest colibri --pid 1234 --mtype net --span 20 --iter 24000 --out network_20_4min --pert 98
 ```
 
 ### Working with Kubernetes

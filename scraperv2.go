@@ -27,8 +27,8 @@ import (
 )
 
 type Scraper struct {
-    // The process ID of the container
-    pid string
+	// The manager of file path configuration
+	pf *utils.PathFinder
     // The postfix name of output file
     out string
     // The metric scraping timespan in millisecond
@@ -39,16 +39,16 @@ type Scraper struct {
     pert float64
 }
 
-const output_path = "/output/"
+const logPath = "/log/"
 
 func (s Scraper) getCpuData() []float64 {
 
-    cpu_data_fullpath := utils.GetCpuPathV2(s.pid)
-    var stats_outputs = []string{}
+    cpuPath := s.pf.GetCpuPathV2()
+    var statsOutput = []string{}
 
     for i:=0; i<s.iter; i++ {
         t0 := time.Now()
-        stats, err  := os.ReadFile(cpu_data_fullpath)
+        stats, err  := os.ReadFile(cpuPath)
         if err != nil {
             if i == 0 {
             // nothing existed in output, then forcefully stop
@@ -58,7 +58,7 @@ func (s Scraper) getCpuData() []float64 {
                 break
             }
         }
-        stats_outputs = append(stats_outputs, string(stats))
+        statsOutput = append(statsOutput, string(stats))
         time.Sleep(time.Duration(s.ms) * time.Millisecond)
         dura := time.Now().Sub(t0)
         fmt.Println(dura.Nanoseconds())
@@ -66,28 +66,30 @@ func (s Scraper) getCpuData() []float64 {
 
     log.Print("CPU metrics collection is finished. Start to post-process data ...")
 
-    var outputs = make([]string, len(stats_outputs))
+    var outputs = make([]string, len(statsOutput))
 
-    usage_idx := utils.FindIndex(stats_outputs[0], "usage_usec")
+    usageIdx := utils.FindIndex(statsOutput[0], "usage_usec")
 
     for i := 0; i < len(outputs); i++ {
-        outputs[i] = strings.Fields(strings.Split(stats_outputs[i], "\n")[usage_idx])[1]
+        outputs[i] = strings.Fields(strings.Split(statsOutput[i], "\n")[usageIdx])[1]
     }
+
     //if outputName == none, then don't write out, just print analysis result
     if strings.Contains(s.out, "file:") {
-        f := utils.CreateOutputFile(output_path + s.out[5:] + "_" +fmt.Sprint(s.ms) + "ms_cpu")
+        f := utils.CreateOutputFile(logPath + s.out[5:] + "_" +fmt.Sprint(s.ms) + "ms_cpu")
         defer f.Close()
 
         for i:=0; i<len(outputs); i++ {
             f.WriteString(outputs[i]+"\n")
         }
     }
+
     return utils.CountRate(outputs, s.ms, s.pert)
 }
 
 func (s Scraper) getMemoryData() []float64 {
 
-    usage_file, stats_file := utils.GetMemPathV2(s.pid)
+    usage_file, stats_file := s.pf.GetMemPathV2()
 
     var usage_outputs, stats_outputs = []string{}, []string{}
 
@@ -134,7 +136,7 @@ func (s Scraper) getMemoryData() []float64 {
 
     //if outputName == none, then don't write out, just print analysis result
     if strings.Contains(s.out, "file:") {
-        f := utils.CreateOutputFile(output_path + s.out[5:] + "_" +fmt.Sprint(s.ms) + "ms_mem")
+        f := utils.CreateOutputFile(logPath + s.out[5:] + "_" +fmt.Sprint(s.ms) + "ms_mem")
         defer f.Close()
 
 
@@ -149,7 +151,7 @@ func (s Scraper) getMemoryData() []float64 {
 func (s Scraper) getNetworkData(iface string) []float64 {
 
     var outputs =[]string{}
-    path := utils.GetNetPath(s.pid)
+    path := s.pf.GetNetPath()
 
     for i := 0; i < s.iter; i++ {
         net_stat, err := os.ReadFile(path)
@@ -188,8 +190,8 @@ func (s Scraper) getNetworkData(iface string) []float64 {
 
     //if outputName == none, then don't write out, just print analysis result
     if strings.Contains(s.out, "file:") {
-        ig_file := utils.CreateOutputFile(output_path + s.out[5:] + "_" + fmt.Sprint(s.ms) + "ms_ig_bytes")
-        eg_file := utils.CreateOutputFile(output_path + s.out[5:] + "_" + fmt.Sprint(s.ms) + "ms_eg_bytes")
+        ig_file := utils.CreateOutputFile(logPath + s.out[5:] + "_" + fmt.Sprint(s.ms) + "ms_ig_bytes")
+        eg_file := utils.CreateOutputFile(logPath + s.out[5:] + "_" + fmt.Sprint(s.ms) + "ms_eg_bytes")
 
         defer ig_file.Close()
         defer eg_file.Close()
@@ -286,9 +288,9 @@ func getIfaceIndex(path string, iface string) int {
 
 func (s Scraper) getAllData(iface string) ([]float64, []float64, []float64) {
     //get path of container
-    cpu_path := utils.GetCpuPathV2(s.pid)
-    usage_path, stats_path := utils.GetMemPathV2(s.pid)
-    net_path := utils.GetNetPath(s.pid)
+    cpu_path := s.pf.GetCpuPathV2()
+    usage_path, stats_path := s.pf.GetMemPathV2()
+    net_path := s.pf.GetNetPath()
 
     var cpu_outputs, ig_outputs, eg_outputs, time_outputs []string
     var mem_outputs = []float64{}
@@ -322,7 +324,7 @@ func (s Scraper) getAllData(iface string) ([]float64, []float64, []float64) {
 
     //if outputName == none, then don't write out, just print analysis result
     if strings.Contains(s.out, "file:") {
-        file_prefix := output_path + s.out[5:] + "_" +fmt.Sprint(s.ms)
+        file_prefix := logPath + s.out[5:] + "_" +fmt.Sprint(s.ms)
 
         cpu_f := utils.CreateOutputFile(file_prefix + "ms_cpu")
         defer cpu_f.Close()
@@ -378,7 +380,16 @@ func main () {
         log.Print("Monitoring process cannot be processed with intervalMsec less and equal 0.")
         return
     }
-    scraper := Scraper{pid, outputName, intervalMsec, iterateNum, percentile}
+	//initialize the path config
+	pf, err := utils.CreatePathFinder(pid)
+
+	if err != nil {
+        log.Printf("Failed to create a PathFinder for target container: ", err)
+        //log.Print("Test done!")
+        return
+	}
+
+    scraper := Scraper{pf, outputName, intervalMsec, iterateNum, percentile}
 
     //getting numbers by type
     switch metricType {
@@ -445,6 +456,6 @@ func main () {
             log.Fatal("metric type is not in the handling list")
     }
 
-    log.Print("Coutils.i is successfully completed !")
+    log.Print("Colibri is successfully completed !")
 
 }
