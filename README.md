@@ -140,6 +140,6 @@ We will run a job with proper permission attached to it.
 The other job configurations are similar to the standalone version. Just be careful the `--out` flag.
 
 
-## Run the Colibri Job simplely as a Go program
+## Run the Colibri Job simplely as a Go program at localhost
 
-I develop this local run compatibility is for fast verification.
+This feature is mainly designed for fast verification and program profiling.
