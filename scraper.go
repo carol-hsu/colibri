@@ -38,16 +38,16 @@ type Scraper struct {
     pert float64
 }
 
-const output_path = "/output/"
+const logPath = "/log/"
 
 func (s Scraper) getCpuData() []float64 {
 
-    cpu_data_fullpath := s.pf.GetCpuPath()
+    cpuPath := s.pf.GetCpuPath()
 
     var outputs = []string{}
 
     for i:=0; i<s.iter; i++ {
-        v, err  := ioutil.ReadFile(cpu_data_fullpath)
+        v, err  := ioutil.ReadFile(cpuPath)
         if err != nil {
             if i == 0 {
             // nothing existed in output, then forcefully stop
@@ -64,11 +64,11 @@ func (s Scraper) getCpuData() []float64 {
     log.Print("CPU metrics collection is finished. Start to post-process data ...")
     //if outputName == none, then don't write out, just print analysis result
     if strings.Contains(s.out, "file:") {
-        f := utils.CreateOutputFile(output_path + s.out[5:] + "_" +fmt.Sprint(s.ms) + "ms_cpu")
-        defer f.Close()
+        file := utils.CreateOutputFile(logPath + s.out[5:] + "_" +fmt.Sprint(s.ms) + "ms_cpu")
+        defer file.Close()
 
         for i:=0; i<len(outputs); i++ {
-            f.WriteString(outputs[i]+"\n")
+            file.WriteString(outputs[i]+"\n")
         }
     }
 
@@ -77,13 +77,13 @@ func (s Scraper) getCpuData() []float64 {
 
 func (s Scraper) getMemoryData() []float64 {
 
-    usage_file, stats_file := s.pf.GetMemPath()
+    usagePath, statsPath := s.pf.GetMemPath()
 
-    var usage_outputs, stats_outputs = []string{}, []string{}
+    var usageOutput, statsOutput = []string{}, []string{}
 
     for i:=0; i < s.iter; i++ {
 
-        usage, err  := ioutil.ReadFile(usage_file)
+        usage, err  := ioutil.ReadFile(usagePath)
         if err != nil {
             if i == 0 {
             // nothing existed in output, then forcefully stop
@@ -93,9 +93,9 @@ func (s Scraper) getMemoryData() []float64 {
                 break
             }
         }
-        usage_outputs = append(usage_outputs, strings.TrimSpace(string(usage)))
+        usageOutput = append(usageOutput, strings.TrimSpace(string(usage)))
 
-        stats, err  := ioutil.ReadFile(stats_file)
+        stats, err  := ioutil.ReadFile(statsPath)
         if err != nil {
             if i == 0 {
             // nothing existed in output, then forcefully stop
@@ -105,7 +105,7 @@ func (s Scraper) getMemoryData() []float64 {
                 break
             }
         }
-        stats_outputs = append(stats_outputs, string(stats))
+        statsOutput = append(statsOutput, string(stats))
 
         time.Sleep(time.Duration(s.ms) * time.Millisecond)
     }
@@ -113,23 +113,23 @@ func (s Scraper) getMemoryData() []float64 {
     log.Print("Memory metrics collection is finished. Start to post-process data ...")
 
     //count usage and inactive file size, and stored in float
-    var outputs = make([]float64, len(stats_outputs))
+    var outputs = make([]float64, len(statsOutput))
 
-    inactive_file_idx := utils.FindIndex(stats_outputs[0], "total_inactive_file")
+    inactiveFileIdx := utils.FindIndex(statsOutput[0], "total_inactive_file")
 
     for i := 0; i < len(outputs); i++ {
-        v := utils.StringToFloat(usage_outputs[i]) - utils.StringToFloat(strings.Fields(strings.Split(stats_outputs[i], "\n")[inactive_file_idx])[1])
+        v := utils.StringToFloat(usageOutput[i]) - utils.StringToFloat(strings.Fields(strings.Split(statsOutput[i], "\n")[inactiveFileIdx])[1])
         outputs[i] = v
     }
 
     //if outputName == none, then don't write out, just print analysis result
     if strings.Contains(s.out, "file:") {
-        f := utils.CreateOutputFile(output_path + s.out[5:] + "_" +fmt.Sprint(s.ms) + "ms_mem")
-        defer f.Close()
+        file := utils.CreateOutputFile(logPath + s.out[5:] + "_" +fmt.Sprint(s.ms) + "ms_mem")
+        defer file.Close()
 
 
         for i := 0; i < len(outputs); i++ {
-            f.WriteString(fmt.Sprintf("%f\n", outputs[i]))
+            file.WriteString(fmt.Sprintf("%f\n", outputs[i]))
         }
     }
 
@@ -142,7 +142,7 @@ func (s Scraper) getNetworkData(iface string) []float64 {
     path := s.pf.GetNetPath()
 
     for i := 0; i < s.iter; i++ {
-        net_stat, err := ioutil.ReadFile(path)
+        stat, err := ioutil.ReadFile(path)
 
         if err != nil {
             if i == 0 {
@@ -153,46 +153,46 @@ func (s Scraper) getNetworkData(iface string) []float64 {
                 break
             }
         }
-        outputs = append(outputs, string(net_stat))
+        outputs = append(outputs, string(stat))
         time.Sleep(time.Duration(s.ms) * time.Millisecond)
     }
 
     log.Print("Network metrics collection is finished. Start to post-process data ...")
 
-    eth0_idx := utils.FindIndex(outputs[0], iface)
+    ifaceIdx := utils.FindIndex(outputs[0], iface)
 
-    if eth0_idx < 0 {
+    if ifaceIdx < 0 {
         log.Fatal("No info for the specified interface")
     }
 
     //parse bandwidth value, and store separately
-    var output_len = len(outputs)
-    var ig_bw = make([]string, output_len)
-    var eg_bw = make([]string, output_len)
+    var outputLen = len(outputs)
+    var igBw = make([]string, outputLen)
+    var egBw = make([]string, outputLen)
 
-    for i := 0; i < output_len; i++ {
-        metrics := strings.Fields(strings.Split(outputs[i], "\n")[eth0_idx])
-        ig_bw[i] = metrics[1]
-        eg_bw[i] = metrics[9]
+    for i := 0; i < outputLen; i++ {
+        metrics := strings.Fields(strings.Split(outputs[i], "\n")[ifaceIdx])
+        igBw[i] = metrics[1]
+        egBw[i] = metrics[9]
     }
 
     //if outputName == none, then don't write out, just print analysis result
     if strings.Contains(s.out, "file:") {
-        ig_file := utils.CreateOutputFile(output_path + s.out[5:] + "_" + fmt.Sprint(s.ms) + "ms_ig_bytes")
-        eg_file := utils.CreateOutputFile(output_path + s.out[5:] + "_" + fmt.Sprint(s.ms) + "ms_eg_bytes")
+        igFile := utils.CreateOutputFile(logPath + s.out[5:] + "_" + fmt.Sprint(s.ms) + "ms_ig_bytes")
+        egFile := utils.CreateOutputFile(logPath + s.out[5:] + "_" + fmt.Sprint(s.ms) + "ms_eg_bytes")
 
-        defer ig_file.Close()
-        defer eg_file.Close()
+        defer igFile.Close()
+        defer egFile.Close()
 
         // create output files
-        for i := 0; i < output_len; i++ {
-            ig_file.WriteString(ig_bw[i]+"\n")
-            eg_file.WriteString(eg_bw[i]+"\n")
+        for i := 0; i < outputLen; i++ {
+            igFile.WriteString(igBw[i]+"\n")
+            egFile.WriteString(egBw[i]+"\n")
         }
     }
 
-    ig_res := utils.CountRate(ig_bw, s.ms, s.pert)
-    eg_res := utils.CountRate(eg_bw, s.ms, s.pert)
+    ig_res := utils.CountRate(igBw, s.ms, s.pert)
+    eg_res := utils.CountRate(egBw, s.ms, s.pert)
 
 
     return append(ig_res, eg_res...)
@@ -208,24 +208,24 @@ func getCpuValue(path string) string {
     return strings.TrimSpace(string(v))
 }
 
-func getMemoryValue(usage_path string, stats_path string, idx int) float64 {
+func getMemoryValue(usageFile string, statsFile string, idx int) float64 {
 
-    usage, err  := ioutil.ReadFile(usage_path)
+    usage, err  := ioutil.ReadFile(usageFile)
     if err != nil {
         log.Print("Cannot read usage file of memory.")
         return -1
     }
 
-    usage_output := strings.TrimSpace(string(usage))
+    usageOutput := strings.TrimSpace(string(usage))
 
-    stats, err  := ioutil.ReadFile(stats_path)
+    stats, err  := ioutil.ReadFile(statsFile)
     if err != nil {
         log.Print("Cannot read statistic file of memory.")
         return -1
     }
-    stats_output := string(stats)
+    statsOutput := string(stats)
 
-    return utils.StringToFloat(usage_output) - utils.StringToFloat(strings.Fields(strings.Split(stats_output, "\n")[idx])[1])
+    return utils.StringToFloat(usageOutput) - utils.StringToFloat(strings.Fields(strings.Split(statsOutput, "\n")[idx])[1])
 }
 
 func getInactiveFileIndex(path string) int {
@@ -241,12 +241,12 @@ func getInactiveFileIndex(path string) int {
 
 func getNetworkValue(path string, idx int) (string, string) {
 
-    net_stat, err := ioutil.ReadFile(path)
+    netStat, err := ioutil.ReadFile(path)
     if err != nil {
         log.Print("Cannot read statistic file of network.")
         return "", ""
     }
-    stats := strings.Fields(strings.Split(string(net_stat), "\n")[idx])
+    stats := strings.Fields(strings.Split(string(netStat), "\n")[idx])
 
     return stats[1], stats[9]
 }
@@ -264,66 +264,66 @@ func getIfaceIndex(path string, iface string) int {
 
 func (s Scraper) getAllData(iface string) ([]float64, []float64, []float64) {
     //get path of container
-    cpu_path := s.pf.GetCpuPath()
-    usage_path, stats_path := s.pf.GetMemPath()
-    net_path := s.pf.GetNetPath()
+    cpuPath := s.pf.GetCpuPath()
+    usagePath, statsPath := s.pf.GetMemPath()
+    netPath := s.pf.GetNetPath()
 
-    var cpu_outputs, ig_outputs, eg_outputs []string
-    var mem_outputs = []float64{}
+    var cpuOutput, igOutput, egOutput []string
+    var memOutput = []float64{}
 
     //get index for collecting data from memory statistic file
-    mem_idx := getInactiveFileIndex(stats_path)
-    net_idx := getIfaceIndex(net_path, iface)
+    memIdx := getInactiveFileIndex(statsPath)
+    netIdx := getIfaceIndex(netPath, iface)
 
     //start metrics scraping period
     for i:=0; i < s.iter; i++ {
-        cpu_v := getCpuValue(cpu_path)
-        mem_v := getMemoryValue(usage_path, stats_path, mem_idx)
-        ig_bw, eg_bw := getNetworkValue(net_path, net_idx)
+        cpuVal := getCpuValue(cpuPath)
+        memVal := getMemoryValue(usagePath, statsPath, memIdx)
+        igBw, egBw := getNetworkValue(netPath, netIdx)
 
-        if mem_v < 0 || len(cpu_v) == 0 || len(ig_bw) == 0 {
+        if memVal < 0 || len(cpuVal) == 0 || len(igBw) == 0 {
             log.Print("App stopped earlier, starting to print output")
             break
         }
 
-        cpu_outputs = append(cpu_outputs, cpu_v)
-        mem_outputs = append(mem_outputs, mem_v)
-        ig_outputs = append(ig_outputs, ig_bw)
-        eg_outputs = append(eg_outputs, eg_bw)
+        cpuOutput = append(cpuOutput, cpuVal)
+        memOutput = append(memOutput, memVal)
+        igOutput = append(igOutput, igBw)
+        egOutput = append(egOutput, egBw)
 
         time.Sleep(time.Duration(s.ms) * time.Millisecond)
     }
 
     //if outputName == none, then don't write out, just print analysis result
     if strings.Contains(s.out, "file:") {
-        file_prefix := output_path + s.out[5:] + "_" +fmt.Sprint(s.ms)
+        filePrefix := logPath + s.out[5:] + "_" +fmt.Sprint(s.ms)
 
-        cpu_f := utils.CreateOutputFile(file_prefix + "ms_cpu")
-        defer cpu_f.Close()
+        cpuFile := utils.CreateOutputFile(filePrefix + "ms_cpu")
+        defer cpuFile.Close()
 
-        mem_f := utils.CreateOutputFile(file_prefix + "ms_mem")
-        defer mem_f.Close()
+        memFile := utils.CreateOutputFile(filePrefix + "ms_mem")
+        defer memFile.Close()
 
-        ig_f := utils.CreateOutputFile(file_prefix + "ms_ig_bytes")
-        defer ig_f.Close()
+        igFile := utils.CreateOutputFile(filePrefix + "ms_ig_bytes")
+        defer igFile.Close()
 
-        eg_f := utils.CreateOutputFile(file_prefix + "ms_eg_bytes")
-        defer eg_f.Close()
+        egFile := utils.CreateOutputFile(filePrefix + "ms_eg_bytes")
+        defer egFile.Close()
 
-        for i := 0; i < len(cpu_outputs); i++ {
-            cpu_f.WriteString(cpu_outputs[i]+"\n")
-            mem_f.WriteString(fmt.Sprintf("%.0f\n", mem_outputs[i]))
-            ig_f.WriteString(ig_outputs[i]+"\n")
-            eg_f.WriteString(eg_outputs[i]+"\n")
+        for i := 0; i < len(cpuOutput); i++ {
+            cpuFile.WriteString(cpuOutput[i]+"\n")
+            memFile.WriteString(fmt.Sprintf("%.0f\n", memOutput[i]))
+            igFile.WriteString(igOutput[i]+"\n")
+            egFile.WriteString(egOutput[i]+"\n")
         }
     }
 
-    cpu_res := utils.CountRate(cpu_outputs, s.ms, s.pert)
-    mem_res := utils.CountValue(mem_outputs, s.pert)
-    ig_res := utils.CountRate(ig_outputs, s.ms, s.pert)
-    eg_res := utils.CountRate(eg_outputs, s.ms, s.pert)
+    cpuRes := utils.CountRate(cpuOutput, s.ms, s.pert)
+    memRes := utils.CountValue(memOutput, s.pert)
+    igRes := utils.CountRate(igOutput, s.ms, s.pert)
+    egRes := utils.CountRate(egOutput, s.ms, s.pert)
 
-    return cpu_res, mem_res, append(ig_res, eg_res...)
+    return cpuRes, memRes, append(igRes, egRes...)
 }
 
 func main () {
