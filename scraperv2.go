@@ -153,7 +153,7 @@ func (s Scraper) getNetworkData(iface string) []float64 {
     path := s.pf.GetNetPath()
 
     for i := 0; i < s.iter; i++ {
-        net_stat, err := os.ReadFile(path)
+        stat, err := os.ReadFile(path)
 
         if err != nil {
             if i == 0 {
@@ -164,7 +164,7 @@ func (s Scraper) getNetworkData(iface string) []float64 {
                 break
             }
         }
-        outputs = append(outputs, string(net_stat))
+        outputs = append(outputs, string(stat))
         time.Sleep(time.Duration(s.ms) * time.Millisecond)
     }
 
@@ -384,7 +384,6 @@ func main () {
 
 	if err != nil {
         log.Printf("Failed to create a PathFinder for target container: ", err)
-        //log.Print("Test done!")
         return
 	}
 
