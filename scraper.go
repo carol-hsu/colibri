@@ -21,11 +21,13 @@ import (
     "log"
     "io/ioutil"
     "strings"
+
+    utils "colibri/internal/lib"
 )
 
 type Scraper struct {
-    // The process ID of the container
-    pid string
+    // The manager of file path configuration
+    pf *utils.PathFinder
     // The postfix name of output file
     out string
     // The metric scraping timespan in millisecond
@@ -40,7 +42,7 @@ const output_path = "/output/"
 
 func (s Scraper) getCpuData() []float64 {
 
-    cpu_data_fullpath := getCpuPath(s.pid)
+    cpu_data_fullpath := s.pf.GetCpuPath()
 
     var outputs = []string{}
 
@@ -62,7 +64,7 @@ func (s Scraper) getCpuData() []float64 {
     log.Print("CPU metrics collection is finished. Start to post-process data ...")
     //if outputName == none, then don't write out, just print analysis result
     if strings.Contains(s.out, "file:") {
-        f := createOutputFile(output_path + s.out[5:] + "_" +fmt.Sprint(s.ms) + "ms_cpu")
+        f := utils.CreateOutputFile(output_path + s.out[5:] + "_" +fmt.Sprint(s.ms) + "ms_cpu")
         defer f.Close()
 
         for i:=0; i<len(outputs); i++ {
@@ -70,12 +72,12 @@ func (s Scraper) getCpuData() []float64 {
         }
     }
 
-    return countRate(outputs, s.ms, s.pert)
+    return utils.CountRate(outputs, s.ms, s.pert)
 }
 
 func (s Scraper) getMemoryData() []float64 {
 
-    usage_file, stats_file := getMemPath(s.pid)
+    usage_file, stats_file := s.pf.GetMemPath()
 
     var usage_outputs, stats_outputs = []string{}, []string{}
 
@@ -113,16 +115,16 @@ func (s Scraper) getMemoryData() []float64 {
     //count usage and inactive file size, and stored in float
     var outputs = make([]float64, len(stats_outputs))
 
-    inactive_file_idx := findIndex(stats_outputs[0], "total_inactive_file")
+    inactive_file_idx := utils.FindIndex(stats_outputs[0], "total_inactive_file")
 
     for i := 0; i < len(outputs); i++ {
-        v := stringToFloat(usage_outputs[i]) - stringToFloat(strings.Fields(strings.Split(stats_outputs[i], "\n")[inactive_file_idx])[1])
+        v := utils.StringToFloat(usage_outputs[i]) - utils.StringToFloat(strings.Fields(strings.Split(stats_outputs[i], "\n")[inactive_file_idx])[1])
         outputs[i] = v
     }
 
     //if outputName == none, then don't write out, just print analysis result
     if strings.Contains(s.out, "file:") {
-        f := createOutputFile(output_path + s.out[5:] + "_" +fmt.Sprint(s.ms) + "ms_mem")
+        f := utils.CreateOutputFile(output_path + s.out[5:] + "_" +fmt.Sprint(s.ms) + "ms_mem")
         defer f.Close()
 
 
@@ -131,13 +133,13 @@ func (s Scraper) getMemoryData() []float64 {
         }
     }
 
-    return countValue(outputs, s.pert)
+    return utils.CountValue(outputs, s.pert)
 }
 
 func (s Scraper) getNetworkData(iface string) []float64 {
 
     var outputs =[]string{}
-    path := getNetPath(s.pid)
+    path := s.pf.GetNetPath()
 
     for i := 0; i < s.iter; i++ {
         net_stat, err := ioutil.ReadFile(path)
@@ -157,7 +159,7 @@ func (s Scraper) getNetworkData(iface string) []float64 {
 
     log.Print("Network metrics collection is finished. Start to post-process data ...")
 
-    eth0_idx := findIndex(outputs[0], iface)
+    eth0_idx := utils.FindIndex(outputs[0], iface)
 
     if eth0_idx < 0 {
         log.Fatal("No info for the specified interface")
@@ -176,8 +178,8 @@ func (s Scraper) getNetworkData(iface string) []float64 {
 
     //if outputName == none, then don't write out, just print analysis result
     if strings.Contains(s.out, "file:") {
-        ig_file := createOutputFile(output_path + s.out[5:] + "_" + fmt.Sprint(s.ms) + "ms_ig_bytes")
-        eg_file := createOutputFile(output_path + s.out[5:] + "_" + fmt.Sprint(s.ms) + "ms_eg_bytes")
+        ig_file := utils.CreateOutputFile(output_path + s.out[5:] + "_" + fmt.Sprint(s.ms) + "ms_ig_bytes")
+        eg_file := utils.CreateOutputFile(output_path + s.out[5:] + "_" + fmt.Sprint(s.ms) + "ms_eg_bytes")
 
         defer ig_file.Close()
         defer eg_file.Close()
@@ -189,8 +191,8 @@ func (s Scraper) getNetworkData(iface string) []float64 {
         }
     }
 
-    ig_res := countRate(ig_bw, s.ms, s.pert)
-    eg_res := countRate(eg_bw, s.ms, s.pert)
+    ig_res := utils.CountRate(ig_bw, s.ms, s.pert)
+    eg_res := utils.CountRate(eg_bw, s.ms, s.pert)
 
 
     return append(ig_res, eg_res...)
@@ -223,7 +225,7 @@ func getMemoryValue(usage_path string, stats_path string, idx int) float64 {
     }
     stats_output := string(stats)
 
-    return stringToFloat(usage_output) - stringToFloat(strings.Fields(strings.Split(stats_output, "\n")[idx])[1])
+    return utils.StringToFloat(usage_output) - utils.StringToFloat(strings.Fields(strings.Split(stats_output, "\n")[idx])[1])
 }
 
 func getInactiveFileIndex(path string) int {
@@ -234,7 +236,7 @@ func getInactiveFileIndex(path string) int {
         return -1
     }
 
-    return findIndex(string(stats), "total_inactive_file")
+    return utils.FindIndex(string(stats), "total_inactive_file")
 }
 
 func getNetworkValue(path string, idx int) (string, string) {
@@ -257,14 +259,14 @@ func getIfaceIndex(path string, iface string) int {
         return -1
     }
 
-    return findIndex(string(stats), iface)
+    return utils.FindIndex(string(stats), iface)
 }
 
 func (s Scraper) getAllData(iface string) ([]float64, []float64, []float64) {
     //get path of container
-    cpu_path := getCpuPath(s.pid)
-    usage_path, stats_path := getMemPath(s.pid)
-    net_path := getNetPath(s.pid)
+    cpu_path := s.pf.GetCpuPath()
+    usage_path, stats_path := s.pf.GetMemPath()
+    net_path := s.pf.GetNetPath()
 
     var cpu_outputs, ig_outputs, eg_outputs []string
     var mem_outputs = []float64{}
@@ -296,16 +298,16 @@ func (s Scraper) getAllData(iface string) ([]float64, []float64, []float64) {
     if strings.Contains(s.out, "file:") {
         file_prefix := output_path + s.out[5:] + "_" +fmt.Sprint(s.ms)
 
-        cpu_f := createOutputFile(file_prefix + "ms_cpu")
+        cpu_f := utils.CreateOutputFile(file_prefix + "ms_cpu")
         defer cpu_f.Close()
 
-        mem_f := createOutputFile(file_prefix + "ms_mem")
+        mem_f := utils.CreateOutputFile(file_prefix + "ms_mem")
         defer mem_f.Close()
 
-        ig_f := createOutputFile(file_prefix + "ms_ig_bytes")
+        ig_f := utils.CreateOutputFile(file_prefix + "ms_ig_bytes")
         defer ig_f.Close()
 
-        eg_f := createOutputFile(file_prefix + "ms_eg_bytes")
+        eg_f := utils.CreateOutputFile(file_prefix + "ms_eg_bytes")
         defer eg_f.Close()
 
         for i := 0; i < len(cpu_outputs); i++ {
@@ -316,10 +318,10 @@ func (s Scraper) getAllData(iface string) ([]float64, []float64, []float64) {
         }
     }
 
-    cpu_res := countRate(cpu_outputs, s.ms, s.pert)
-    mem_res := countValue(mem_outputs, s.pert)
-    ig_res := countRate(ig_outputs, s.ms, s.pert)
-    eg_res := countRate(eg_outputs, s.ms, s.pert)
+    cpu_res := utils.CountRate(cpu_outputs, s.ms, s.pert)
+    mem_res := utils.CountValue(mem_outputs, s.pert)
+    ig_res := utils.CountRate(ig_outputs, s.ms, s.pert)
+    eg_res := utils.CountRate(eg_outputs, s.ms, s.pert)
 
     return cpu_res, mem_res, append(ig_res, eg_res...)
 }
@@ -347,66 +349,74 @@ func main () {
         return
     }
 
-    scraper := Scraper{pid, outputName, intervalMsec, iterateNum, percentile}
+    //initialize the path config
+    pf, err := utils.CreatePathFinder(pid)
+
+    if err != nil {
+        log.Printf("Failed to create a PathFinder for target container: ", err)
+        return
+    }
+
+    scraper := Scraper{pf, outputName, intervalMsec, iterateNum, percentile}
 
     //getting numbers by type
     switch metricType {
         case "cpu" :
             log.Print("Starting to get CPU data")
             res := scraper.getCpuData()
-            pertRes := transCpuUnit(res[1])
-            printResult(name, "CPU", transCpuUnit(res[0]), pertRes, percentile)
+            pertRes := utils.TransCpuUnit(res[1])
+            utils.PrintResult(name, "CPU", utils.TransCpuUnit(res[0]), pertRes, percentile)
 
             if scraper.out[:4] == "api:" {
                 log.Println("Calling API!")
-                sendMetric([]byte(`{ "cpu" : "` + pertRes + `" }`), scraper.out[4:])
+                utils.SendMetric([]byte(`{ "cpu" : "` + pertRes + `" }`), scraper.out[4:])
             }
 
         case "mem" :
             log.Print("Starting to get RAM data")
             res := scraper.getMemoryData()
-            pertRes := transMemoryUnit(res[1])
-            printResult(name, "RAM", transMemoryUnit(res[0]), pertRes, percentile)
+            pertRes := utils.TransMemoryUnit(res[1])
+            utils.PrintResult(name, "RAM", utils.TransMemoryUnit(res[0]), pertRes, percentile)
 
             if scraper.out[:4] == "api:" {
                 log.Println("Calling API!")
-                sendMetric([]byte(`{ "ram" : "` + pertRes + `" }`), scraper.out[4:])
+                utils.SendMetric([]byte(`{ "ram" : "` + pertRes + `" }`), scraper.out[4:])
             }
 
         case "net" :
             log.Print("Starting to get network data")
             res := scraper.getNetworkData(netIface)
-            igPertRes := transBandwidthUnit(res[1])
-            egPertRes := transBandwidthUnit(res[3])
-            printResult(name, "Ingress", transBandwidthUnit(res[0]), igPertRes, percentile)
-            printResult(name, "Egress", transBandwidthUnit(res[2]), egPertRes, percentile)
+            igPertRes := utils.TransBandwidthUnit(res[1])
+            egPertRes := utils.TransBandwidthUnit(res[3])
+            utils.PrintResult(name, "Ingress", utils.TransBandwidthUnit(res[0]), igPertRes, percentile)
+            utils.PrintResult(name, "Egress", utils.TransBandwidthUnit(res[2]), egPertRes, percentile)
 
             if scraper.out[:4] == "api:" {
                 log.Println("Calling API!")
-                sendMetric([]byte(`{ "ingress" : "` + igPertRes + `", "egress" : "` + egPertRes + `" }`), scraper.out[4:])
+                utils.SendMetric([]byte(`{ "ingress" : "` + igPertRes + `", "egress" : "` + egPertRes + `" }`), scraper.out[4:])
             }
 
         case "all":
             log.Print("Starting to get all metrics: ")
             cpuRes, memRes, netRes := scraper.getAllData(netIface)
 
-            cpuPertRes := transCpuUnit(cpuRes[1])
-            printResult(name, "CPU", transCpuUnit(cpuRes[0]), cpuPertRes, percentile)
+            cpuPertRes := utils.TransCpuUnit(cpuRes[1])
+            utils.PrintResult(name, "CPU", utils.TransCpuUnit(cpuRes[0]), cpuPertRes, percentile)
 
-            memPertRes := transMemoryUnit(memRes[1])
-            printResult(name, "RAM", transMemoryUnit(memRes[0]), memPertRes, percentile)
+            memPertRes := utils.TransMemoryUnit(memRes[1])
+            utils.PrintResult(name, "RAM", utils.TransMemoryUnit(memRes[0]), memPertRes, percentile)
 
-            igPertRes := transBandwidthUnit(netRes[1])
-            egPertRes := transBandwidthUnit(netRes[3])
-            printResult(name, "Ingress", transBandwidthUnit(netRes[0]), igPertRes, percentile)
-            printResult(name, "Egress", transBandwidthUnit(netRes[2]), egPertRes, percentile)
+            igPertRes := utils.TransBandwidthUnit(netRes[1])
+            egPertRes := utils.TransBandwidthUnit(netRes[3])
+            utils.PrintResult(name, "Ingress", utils.TransBandwidthUnit(netRes[0]), igPertRes, percentile)
+            utils.PrintResult(name, "Egress", utils.TransBandwidthUnit(netRes[2]), egPertRes, percentile)
 
             if scraper.out[:4] == "api:" {
                 log.Println("Calling API!")
-                sendMetric([]byte(`{ "cpu": "` + cpuPertRes +
-                                 `", "ram": "` + memPertRes +
-                                 `", "ingress": "` + igPertRes +
-                                 `", "egress": "` + egPertRes + `" }`), scraper.out[4:])
+                utils.SendMetric([]byte(`{ "cpu": "` + cpuPertRes +
+                                        `", "ram": "` + memPertRes +
+                                        `", "ingress": "` + igPertRes +
+                                        `", "egress": "` + egPertRes + `" }`), scraper.out[4:])
             }
 
 

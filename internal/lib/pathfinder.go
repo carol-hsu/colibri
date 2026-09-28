@@ -23,14 +23,6 @@ import (
 )
 
 const (
-
-	// cgroup_path = "/sys/fs/cgroups/" could be replaced by below
-	// To avoid mixing host's data to container(scraper)'s data, we will mount host data to /tmp
-	//PidCgroupPath        = "/tmp/proc/{pid}/cgroup" //comes out the full path of CPU and RAM
-	//NetMetricsPath       = "/tmp/proc/{pid}/net/dev"
-	//CgroupFilesystemDir  = "/tmp/cgroup"
-	//CgroupFilesystemPath = CgroupFilesystemDir + "/"
-
     rootSchedFile = "/proc/1/sched"
 	CpuDirectory = "cpu,cpuacct"
 	MemDirectory = "memory"
@@ -49,11 +41,11 @@ func CreatePathFinder(pid string) (*PathFinder, error) {
 	// detect if the process is running on a host or in a container
 
     file, err := os.Open(rootSchedFile)
-    
+
     if err != nil {
         return nil, err
     }
-    
+
 	defer file.Close()
 
     scanner := bufio.NewScanner(file)
@@ -62,7 +54,7 @@ func CreatePathFinder(pid string) (*PathFinder, error) {
 	    if strings.Contains(scanner.Text(), "colibri") {
 		    // we are in a container
 		    return &PathFinder{"/tmp/proc/" + pid + "/cgroup",
-                               "/tmp/proc/" + pid + "/net/dev", 
+                               "/tmp/proc/" + pid + "/net/dev",
                                "/tmp/cgroup"},
 			       nil
 	    }
@@ -107,18 +99,17 @@ func (pf *PathFinder) getCgroupMetricPath(keyword string) string {
 	return ""
 
 }
-/* TODO: need to fix to support v1
-func GetCpuPath(pid string) string {
 
-	path := getCgroupMetricPath(strings.Replace(PidCgroupPath, "{pid}", pid, 1), CpuDirectory)
+func (pf *PathFinder) GetCpuPath() string {
+
+	path := pf.getCgroupMetricPath(CpuDirectory)
 
 	if path == "" {
 		log.Fatal("Error: (cgroup v1) failed to find the path of CPU data\n")
 	}
 
-	return CgroupFilesystemPath + CpuDirectory + path + "/cpuacct.usage"
+	return pf.cgroupPath + "/" + CpuDirectory + path + "/cpuacct.usage"
 }
-*/
 
 func (pf *PathFinder) GetCpuPathV2() string {
 
@@ -133,20 +124,18 @@ func (pf *PathFinder) GetCpuPathV2() string {
 }
 
 
-/* TODO: need to fix to support v1
-func GetMemPath(pid string) (string, string) {
+func (pf *PathFinder) GetMemPath() (string, string) {
 
-	path := getCgroupMetricPath(strings.Replace(PidCgroupPath, "{pid}", pid, 1), MemDirectory)
+	path := pf.getCgroupMetricPath(MemDirectory)
 
 	if path == "" {
 		log.Fatal("Error: failed to find the path of Memory data\n")
 	}
 
-	return CgroupFilesystemPath + MemDirectory + path + "/memory.usage_in_bytes",
-		CgroupFilesystemPath + MemDirectory + path + "/memory.stat"
+	return pf.cgroupPath + "/" + MemDirectory + path + "/memory.usage_in_bytes",
+		   pf.cgroupPath + "/" + MemDirectory + path + "/memory.stat"
 
 }
-*/
 
 func (pf *PathFinder) GetMemPathV2() (string, string) {
 
@@ -156,13 +145,12 @@ func (pf *PathFinder) GetMemPathV2() (string, string) {
 		log.Fatal("Error: failed to find the path of Memory data\n")
 	}
 
-	return pf.cgroupPath + "/" + path + "/memory.current",
-		pf.cgroupPath + "/" + path + "/memory.stat"
+    return pf.cgroupPath + "/" + path + "/memory.current",
+           pf.cgroupPath + "/" + path + "/memory.stat"
 
 }
 
 func (pf *PathFinder) GetNetPath() string {
 	//cgroup v1 and v2 use the same path for network numbers
 	return pf.netPath
-
 }

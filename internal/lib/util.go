@@ -73,7 +73,7 @@ func CountValue(data []float64, percent float64) []float64 {
     return res
 }
 
-func transCpuUnit(cpu float64) string {
+func TransCpuUnit(cpu float64) string {
     return strconv.Itoa(int(math.Round(cpu/1000)))+"m"
 }
 
