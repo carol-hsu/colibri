@@ -1,2 +1,5 @@
 # skip the exe files
 colibri*
+# skip the output file
+output
+output/*
