@@ -26,7 +26,6 @@ import (
 
 func GetCpuMetrics(path string, iteration int, interval int, ch chan<-[]string) []string {
 
-
     var statsOutput = []string{}
     for i:=0; i<iteration; i++ {
         t0 := time.Now()
@@ -36,19 +35,19 @@ func GetCpuMetrics(path string, iteration int, interval int, ch chan<-[]string) 
             // nothing existed in output, then forcefully stop
                 log.Fatal(err)
             }else{
-                log.Print("App stopped earlier, starting to print output")
+                log.Print("Monitored application is stopped, starting to print output")
                 break
             }
         }
-        t1 := time.Now()
-        
         statsOutput = append(statsOutput, string(stats))
+
+        t1 := time.Now()
         time.Sleep(time.Duration(interval) * time.Millisecond)
         t2 := time.Now()
 
         ioDura := t1.Sub(t0)
         interDura := t2.Sub(t1)
-        fmt.Println(ioDura.Nanoseconds(), interDura.Nanoseconds())
+        fmt.Println("CPU", ioDura.Nanoseconds(), interDura.Nanoseconds())
     }
 
     if ch != nil {
@@ -59,7 +58,7 @@ func GetCpuMetrics(path string, iteration int, interval int, ch chan<-[]string) 
 }
 
 
-func AnalyzeCpuMetrics(stats []string, filePrefix string, interval int, percent float64, ch chan<-[]float64) []float64 {
+func AnalyzeCpuMetrics(stats []string, filename string, interval int, percent float64, ch chan<-[]float64) []float64 {
 
     var outputs = make([]string, len(stats))
 
@@ -70,8 +69,8 @@ func AnalyzeCpuMetrics(stats []string, filePrefix string, interval int, percent 
     }
 
     //if filePrefix is empty, then don't write out, just print analysis result
-    if len(filePrefix) > 0 {
-        file := utils.CreateOutputFile(filePrefix + "_" +fmt.Sprint(interval) + "ms_cpu")
+    if len(filename) > 0 {
+        file := utils.CreateOutputFile(filename)
         defer file.Close()
 
         for i:=0; i<len(outputs); i++ {
@@ -87,16 +86,3 @@ func AnalyzeCpuMetrics(stats []string, filePrefix string, interval int, percent 
 
     return rate
 }
-
-
-func getCpuValue(path string, idx int) string {
-
-    stats, err  := os.ReadFile(path)
-    if err != nil {
-        log.Print("Cannot read statistic file of cpu: ", err)
-        return ""
-    }
-
-    return strings.Fields(strings.Split(string(stats), "\n")[idx])[1]
-}
-
