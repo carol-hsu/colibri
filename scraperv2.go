@@ -15,15 +15,13 @@
 package main
 
 import (
-    "time"
     "flag"
     "fmt"
     "log"
     "os"
     "strings"
-    "strconv"
 
-	utils "colibri/internal/lib"
+    utils "colibri/internal/lib"
     metrics "colibri/internal/metrics"
 )
 
@@ -45,7 +43,7 @@ const logPath = "/log/"
 func (s Scraper) getCpuData() []float64 {
 
     path := s.pf.GetCpuPathV2()
-    stats := metrics.GetCpuMetrics(path, s.iter, s.ms, nil)
+    stats := metrics.GetMetrics("CPU", path, s.iter, s.ms, nil)
 
     log.Print("CPU metrics collection is finished. Start to post-process data ...")
     var output = []float64{}
@@ -67,7 +65,6 @@ func (s Scraper) getMemoryData() []float64 {
     log.Print("Memory metrics collection is finished. Start to post-process data ...")
     var output = []float64{}
 
-
     if strings.Contains(s.out, "file:") {
         output = metrics.AnalyzeMemoryMetrics(usage, stats, logPath+s.out[5:]+"_"+fmt.Sprint(s.ms)+"ms_mem", s.pert, nil)
     } else {
@@ -79,76 +76,26 @@ func (s Scraper) getMemoryData() []float64 {
 
 func (s Scraper) getNetworkData(iface string) []float64 {
 
-    var outputs =[]string{}
     path := s.pf.GetNetPath()
-
-    for i := 0; i < s.iter; i++ {
-        stat, err := os.ReadFile(path)
-
-        if err != nil {
-            if i == 0 {
-            // nothing existed in output, then forcefully stop
-                log.Fatal(err)
-            }else{
-                log.Print("App stopped earlier, starting to print output")
-                break
-            }
-        }
-        outputs = append(outputs, string(stat))
-        time.Sleep(time.Duration(s.ms) * time.Millisecond)
+    //get index for collecting data from memory statistic file
+    ifaceIdx := getIfaceIndex(path, iface)
+    if ifaceIdx < 0 {
+        log.Fatal("The requested network interface is not existed:", iface)
     }
+
+    stats := metrics.GetMetrics("Network", path, s.iter, s.ms, nil)
 
     log.Print("Network metrics collection is finished. Start to post-process data ...")
 
-    ifaceIdx := utils.FindIndex(outputs[0], iface)
+    var output = []float64{}
 
-    if ifaceIdx < 0 {
-        log.Fatal("No info for the specified interface")
-    }
-
-    //parse bandwidth value, and store separately
-    var outputLen = len(outputs)
-    var igBw = make([]string, outputLen)
-    var egBw = make([]string, outputLen)
-
-    for i := 0; i < outputLen; i++ {
-        metrics := strings.Fields(strings.Split(outputs[i], "\n")[ifaceIdx])
-        igBw[i] = metrics[1]
-        egBw[i] = metrics[9]
-    }
-
-    //if outputName == none, then don't write out, just print analysis result
     if strings.Contains(s.out, "file:") {
-        igFile := utils.CreateOutputFile(logPath + s.out[5:] + "_" + fmt.Sprint(s.ms) + "ms_ig_bytes")
-        egFile := utils.CreateOutputFile(logPath + s.out[5:] + "_" + fmt.Sprint(s.ms) + "ms_eg_bytes")
-
-        defer igFile.Close()
-        defer egFile.Close()
-
-        // create output files
-        for i := 0; i < outputLen; i++ {
-            igFile.WriteString(igBw[i]+"\n")
-            egFile.WriteString(egBw[i]+"\n")
-        }
+        output = metrics.AnalyzeNetworkMetrics(stats, ifaceIdx, logPath+s.out[5:]+"_"+fmt.Sprint(s.ms)+"ms_", s.ms, s.pert, nil)
+    } else {
+        output = metrics.AnalyzeNetworkMetrics(stats, ifaceIdx, "", s.ms, s.pert, nil)
     }
 
-    igRes := utils.CountRate(igBw, s.ms, s.pert)
-    egRes := utils.CountRate(egBw, s.ms, s.pert)
-
-
-    return append(igRes, egRes...)
-}
-
-func getNetworkValue(file string, idx int) (string, string) {
-
-    netStats, err := os.ReadFile(file)
-    if err != nil {
-        log.Print("Cannot read statistic file of network.")
-        return "", ""
-    }
-    stats := strings.Fields(strings.Split(string(netStats), "\n")[idx])
-
-    return stats[1], stats[9]
+    return output
 }
 
 func getIfaceIndex(file string, iface string) int {
@@ -168,41 +115,28 @@ func (s Scraper) getAllData(iface string) ([]float64, []float64, []float64) {
     cpuResultChan := make(chan []float64)
     memMetricChan := make(chan []string)
     memResultChan := make(chan []float64)
+    netMetricChan := make(chan []string)
+    netResultChan := make(chan []float64)
 
     //get statistic path of container in cgroupfs
     cpuPath := s.pf.GetCpuPathV2()
-    usagePath, statsPath := s.pf.GetMemPathV2()
     netPath := s.pf.GetNetPath()
-
-    go metrics.GetCpuMetrics(cpuPath, s.iter, s.ms, cpuMetricChan)
-    go metrics.GetMemoryMetrics(usagePath, statsPath, s.iter, s.ms, memMetricChan)
-
-    var igOutput, egOutput, timeOutput []string
+    usagePath, statsPath := s.pf.GetMemPathV2()
 
     //get index for collecting data from memory statistic file
-    netIdx := getIfaceIndex(netPath, iface)
-
-    //start metrics scraping period
-    for i:=0; i < s.iter; i++ {
-        t0 := time.Now()
-        igBw, egBw := getNetworkValue(netPath, netIdx)
-
-        if len(igBw) == 0 {
-            log.Print("App stopped earlier, starting to print output")
-            break
-        }
-
-        igOutput = append(igOutput, igBw)
-        egOutput = append(egOutput, egBw)
-
-        time.Sleep(time.Duration(s.ms) * time.Millisecond)
-        dura := time.Now().Sub(t0)
-        timeOutput = append(timeOutput, strconv.Itoa(int(dura.Nanoseconds())))
+    ifaceIdx := getIfaceIndex(netPath, iface)
+    if ifaceIdx < 0 {
+        log.Fatal("The requested network interface is not existed:", iface)
     }
+
+    go metrics.GetMetrics("CPU", cpuPath, s.iter, s.ms, cpuMetricChan)
+    go metrics.GetMetrics("Network", netPath, s.iter, s.ms, netMetricChan)
+    go metrics.GetMemoryMetrics(usagePath, statsPath, s.iter, s.ms, memMetricChan)
 
     cpuStats := <- cpuMetricChan
     memUsage := <- memMetricChan
     memStats := <- memMetricChan
+    netStats := <- netMetricChan
 
     //if outputName == none, then don't write out, just print analysis result
     if strings.Contains(s.out, "file:") {
@@ -211,32 +145,19 @@ func (s Scraper) getAllData(iface string) ([]float64, []float64, []float64) {
         
         go metrics.AnalyzeCpuMetrics(cpuStats, filePrefix+"cpu", s.ms, s.pert, cpuResultChan)
         go metrics.AnalyzeMemoryMetrics(memUsage, memStats, filePrefix+"mem", s.pert, memResultChan)
+        go metrics.AnalyzeNetworkMetrics(netStats, ifaceIdx, filePrefix, s.ms, s.pert, netResultChan)
 
-        igFile := utils.CreateOutputFile(filePrefix + "ig_bytes")
-        defer igFile.Close()
-
-        egFile := utils.CreateOutputFile(filePrefix + "eg_bytes")
-        defer egFile.Close()
-
-        timeFile := utils.CreateOutputFile(filePrefix + "intervals")
-        defer timeFile.Close()
-
-        for i := 0; i < len(igOutput); i++ {
-            igFile.WriteString(igOutput[i]+"\n")
-            egFile.WriteString(egOutput[i]+"\n")
-            timeFile.WriteString(timeOutput[i]+"\n")
-        }
     }else {
         go metrics.AnalyzeCpuMetrics(cpuStats, "", s.ms, s.pert, cpuResultChan)
         go metrics.AnalyzeMemoryMetrics(memUsage, memStats, "", s.pert, memResultChan)
+        go metrics.AnalyzeNetworkMetrics(netStats, ifaceIdx, "", s.ms, s.pert, netResultChan)
     }
 
     cpuRes := <-cpuResultChan
     memRes := <-memResultChan
-    igRes := utils.CountRate(igOutput, s.ms, s.pert)
-    egRes := utils.CountRate(egOutput, s.ms, s.pert)
+    netRes := <-netResultChan
 
-    return cpuRes, memRes, append(igRes, egRes...)
+    return cpuRes, memRes, netRes
 }
 
 func main () {

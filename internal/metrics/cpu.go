@@ -15,48 +15,10 @@
 package metrics
 
 import (
-    "time"
-    "fmt"
-    "log"
-    "os"
     "strings"
 
 	utils "colibri/internal/lib"
 )
-
-func GetCpuMetrics(path string, iteration int, interval int, ch chan<-[]string) []string {
-
-    var statsOutput = []string{}
-    for i:=0; i<iteration; i++ {
-        t0 := time.Now()
-        stats, err  := os.ReadFile(path)
-        if err != nil {
-            if i == 0 {
-            // nothing existed in output, then forcefully stop
-                log.Fatal(err)
-            }else{
-                log.Print("Monitored application is stopped, starting to print output")
-                break
-            }
-        }
-        statsOutput = append(statsOutput, string(stats))
-
-        t1 := time.Now()
-        time.Sleep(time.Duration(interval) * time.Millisecond)
-        t2 := time.Now()
-
-        ioDura := t1.Sub(t0)
-        interDura := t2.Sub(t1)
-        fmt.Println("CPU", ioDura.Nanoseconds(), interDura.Nanoseconds())
-    }
-
-    if ch != nil {
-        ch <- statsOutput
-    }
-
-    return statsOutput
-}
-
 
 func AnalyzeCpuMetrics(stats []string, filename string, interval int, percent float64, ch chan<-[]float64) []float64 {
 
