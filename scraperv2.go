@@ -43,7 +43,7 @@ const logPath = "/log/"
 func (s Scraper) getCpuData() []float64 {
 
     path := s.pf.GetCpuPathV2()
-    stats := metrics.GetMetrics("CPU", path, s.iter, s.ms, nil)
+    stats := metrics.GetMetrics(path, s.iter, s.ms, logPath+s.out[5:]+"_"+fmt.Sprint(s.ms)+"ms_cpu_delay",  nil)
 
     log.Print("CPU metrics collection is finished. Start to post-process data ...")
     var output = []float64{}
@@ -60,7 +60,7 @@ func (s Scraper) getCpuData() []float64 {
 func (s Scraper) getMemoryData() []float64 {
 
     usagePath, statsPath := s.pf.GetMemPathV2()
-    usage, stats := metrics.GetMemoryMetrics(usagePath, statsPath, s.iter, s.ms, nil)
+    usage, stats := metrics.GetMemoryMetrics(usagePath, statsPath, s.iter, s.ms, logPath+s.out[5:]+"_"+fmt.Sprint(s.ms)+"ms_mem_delay", nil)
 
     log.Print("Memory metrics collection is finished. Start to post-process data ...")
     var output = []float64{}
@@ -83,7 +83,7 @@ func (s Scraper) getNetworkData(iface string) []float64 {
         log.Fatal("The requested network interface is not existed:", iface)
     }
 
-    stats := metrics.GetMetrics("Network", path, s.iter, s.ms, nil)
+    stats := metrics.GetMetrics(path, s.iter, s.ms, logPath+s.out[5:]+"_"+fmt.Sprint(s.ms)+"ms_net_delay", nil)
 
     log.Print("Network metrics collection is finished. Start to post-process data ...")
 
@@ -123,15 +123,18 @@ func (s Scraper) getAllData(iface string) ([]float64, []float64, []float64) {
     netPath := s.pf.GetNetPath()
     usagePath, statsPath := s.pf.GetMemPathV2()
 
+    //for writing out logs
+    filePrefix := logPath + s.out[5:] + "_" +fmt.Sprint(s.ms)+"ms_"
+
     //get index for collecting data from memory statistic file
     ifaceIdx := getIfaceIndex(netPath, iface)
     if ifaceIdx < 0 {
         log.Fatal("The requested network interface is not existed:", iface)
     }
 
-    go metrics.GetMetrics("CPU", cpuPath, s.iter, s.ms, cpuMetricChan)
-    go metrics.GetMetrics("Network", netPath, s.iter, s.ms, netMetricChan)
-    go metrics.GetMemoryMetrics(usagePath, statsPath, s.iter, s.ms, memMetricChan)
+    go metrics.GetMetrics(cpuPath, s.iter, s.ms, filePrefix+"cpu_delay", cpuMetricChan)
+    go metrics.GetMetrics(netPath, s.iter, s.ms, filePrefix+"net_delay", netMetricChan)
+    go metrics.GetMemoryMetrics(usagePath, statsPath, s.iter, s.ms, filePrefix+"mem_delay", memMetricChan)
 
     cpuStats := <- cpuMetricChan
     memUsage := <- memMetricChan
@@ -141,7 +144,6 @@ func (s Scraper) getAllData(iface string) ([]float64, []float64, []float64) {
     //if outputName == none, then don't write out, just print analysis result
     if strings.Contains(s.out, "file:") {
 
-        filePrefix := logPath + s.out[5:] + "_" +fmt.Sprint(s.ms)+"ms_"
         
         go metrics.AnalyzeCpuMetrics(cpuStats, filePrefix+"cpu", s.ms, s.pert, cpuResultChan)
         go metrics.AnalyzeMemoryMetrics(memUsage, memStats, filePrefix+"mem", s.pert, memResultChan)

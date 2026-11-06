@@ -16,58 +16,76 @@ package metrics
 
 import (
     "time"
-    "fmt"
     "log"
     "os"
+    "fmt"
     "strings"
+    "sync"
 
 	utils "colibri/internal/lib"
 )
 
 
-func GetMemoryMetrics(usagePath string, statsPath string, iteration int, interval int, ch chan<-[]string) ([]string, []string) {
+func GetMemoryMetrics(usagePath string, statsPath string, iteration int, interval int, outputFile string, ch chan<-[]string) ([]string, []string) {
 
-    var usageOutput, statsOutput = []string{}, []string{}
+    usageOutput, statsOutput := []string{}, []string{}
+    ioTime, sleepTime := []time.Duration{}, []time.Duration{}
+
+    var usage, stats []byte
+    var usageErr, statsErr error
+
+    var wg sync.WaitGroup
 
     for i:=0; i<iteration; i++ {
-        t0 := time.Now()
-        usage, err  := os.ReadFile(usagePath)
-        if err != nil {
-            if i == 0 {
-            // nothing existed in output, then forcefully stop
-                log.Fatal(err)
-            }else{
-                log.Print("Monitored application is stopped, starting to print output")
-                break
-            }
-        }
-        usageOutput = append(usageOutput, strings.TrimSpace(string(usage)))
 
-        stats, err  := os.ReadFile(statsPath)
-        if err != nil {
+        t0 := time.Now()
+
+        wg.Add(2)
+
+        go func(){
+            defer wg.Done()
+            usage, usageErr = os.ReadFile(usagePath)
+        }()
+
+        go func(){
+            defer wg.Done()
+            stats, statsErr = os.ReadFile(statsPath)
+        }()
+
+        wg.Wait()
+
+        if usageErr != nil || statsErr != nil {
             if i == 0 {
-            // nothing existed in output, then forcefully stop
-                log.Fatal(err)
-            }else{
+                //noting in the output; the file is not existed in the beginning;
+                // TODO: do a better log handling here
+                if usageErr == nil {
+                    log.Fatal(usageErr)
+                } else {
+                    log.Fatal(statsErr)
+                }
+            } else {
                 log.Print("Monitored application is stopped, starting to print output")
                 break
             }
         }
+
+        usageOutput = append(usageOutput, strings.TrimSpace(string(usage)))
         statsOutput = append(statsOutput, string(stats))
 
         t1 := time.Now()
         time.Sleep(time.Duration(interval) * time.Millisecond)
         t2 := time.Now()
 
-        ioDura := t1.Sub(t0)
-        interDura := t2.Sub(t1)
-        fmt.Println("Memory", ioDura.Nanoseconds(), interDura.Nanoseconds())
+        ioTime = append(ioTime, t1.Sub(t0))
+        sleepTime = append(sleepTime, t2.Sub(t1))
     }
 
     if ch != nil {
         ch <- usageOutput
         ch <- statsOutput
     }
+
+    StoreScrapeDelay(outputFile, ioTime, sleepTime)
 
     return usageOutput, statsOutput
 

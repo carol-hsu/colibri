@@ -16,14 +16,15 @@ package metrics
 
 import (
     "time"
-    "fmt"
     "log"
     "os"
+    "strconv"
 )
 
-func GetMetrics(resource string, path string, iteration int, interval int, ch chan<-[]string) []string {
+func GetMetrics(path string, iteration int, interval int, outputFile string, ch chan<-[]string) []string {
 
-    var statsOutput = []string{}
+    statsOutput, ioTime, sleepTime := []string{}, []time.Duration{}, []time.Duration{}
+
     for i:=0; i<iteration; i++ {
         t0 := time.Now()
         stats, err  := os.ReadFile(path)
@@ -41,15 +42,32 @@ func GetMetrics(resource string, path string, iteration int, interval int, ch ch
         time.Sleep(time.Duration(interval) * time.Millisecond)
         t2 := time.Now()
 
-        ioDura := t1.Sub(t0)
-        interDura := t2.Sub(t1)
-        fmt.Println(resource, ioDura.Nanoseconds(), interDura.Nanoseconds())
+        ioTime = append(ioTime, t1.Sub(t0))
+        sleepTime = append(sleepTime, t2.Sub(t1))
     }
 
     if ch != nil {
         ch <- statsOutput
     }
+    StoreScrapeDelay(outputFile, ioTime, sleepTime)
 
     return statsOutput
 }
 
+
+func StoreScrapeDelay(filename string, ioDuration []time.Duration, sleepDuration []time.Duration) {
+
+    f, err := os.Create(filename)
+    defer f.Close()
+
+    if err == nil {
+        for i:=0; i<len(ioDuration); i++ {
+            ioTime := strconv.FormatInt(ioDuration[i].Nanoseconds(), 10)
+            sleepTime := strconv.FormatInt(sleepDuration[i].Nanoseconds(), 10)
+            f.WriteString(ioTime+" "+sleepTime+"\n")
+        }
+    } else {
+        log.Println("Failed to create file [", filename ,"] to output scraping delay:", err)
+    }
+
+}
