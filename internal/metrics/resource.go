@@ -21,7 +21,34 @@ import (
     "strconv"
 )
 
-func GetMetrics(path string, iteration int, interval int, outputFile string, ch chan<-[]string) []string {
+
+func GetMetrics(path string, iteration int, interval int, ch chan<-[]string) []string {
+
+    statsOutput := []string{}
+
+    for i:=0; i<iteration; i++ {
+        stats, err  := os.ReadFile(path)
+        if err != nil {
+            if i == 0 {
+                log.Fatal(err)
+            }else{
+                log.Print("Monitored application is stopped, starting to print output")
+                break
+            }
+        }
+        statsOutput = append(statsOutput, string(stats))
+        time.Sleep(time.Duration(interval) * time.Millisecond)
+    }
+
+    if ch != nil {
+        ch <- statsOutput
+    }
+
+    return statsOutput
+}
+
+
+func GetMetricsDelayTest(path string, iteration int, interval int, outputFile string, ch chan<-[]string) []string {
 
     statsOutput, ioTime, sleepTime := []string{}, []time.Duration{}, []time.Duration{}
 

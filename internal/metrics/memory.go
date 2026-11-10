@@ -25,8 +25,61 @@ import (
 	utils "colibri/internal/lib"
 )
 
+func GetMemoryMetrics(usagePath string, statsPath string, iteration int, interval int, ch chan<-[]string) ([]string, []string) {
 
-func GetMemoryMetrics(usagePath string, statsPath string, iteration int, interval int, outputFile string, ch chan<-[]string) ([]string, []string) {
+    usageOutput, statsOutput := []string{}, []string{}
+
+    var usage, stats []byte
+    var usageErr, statsErr error
+
+    var wg sync.WaitGroup
+
+    for i:=0; i<iteration; i++ {
+
+        wg.Add(2)
+
+        go func(){
+            defer wg.Done()
+            usage, usageErr = os.ReadFile(usagePath)
+        }()
+
+        go func(){
+            defer wg.Done()
+            stats, statsErr = os.ReadFile(statsPath)
+        }()
+
+        wg.Wait()
+
+        if usageErr != nil || statsErr != nil {
+            if i == 0 {
+                //noting in the output; the file is not existed in the beginning;
+                // TODO: do a better log handling here
+                if usageErr == nil {
+                    log.Fatal(usageErr)
+                } else {
+                    log.Fatal(statsErr)
+                }
+            } else {
+                log.Print("Monitored application is stopped, starting to print output")
+                break
+            }
+        }
+        usageOutput = append(usageOutput, strings.TrimSpace(string(usage)))
+        statsOutput = append(statsOutput, string(stats))
+
+        time.Sleep(time.Duration(interval) * time.Millisecond)
+    }
+
+    if ch != nil {
+        ch <- usageOutput
+        ch <- statsOutput
+    }
+
+    return usageOutput, statsOutput
+
+}
+
+func GetMemoryMetricsDelayTest(usagePath string, statsPath string, iteration int, interval int, outputFile string, ch chan<-[]string) ([]string, []string) {
 
     usageOutput, statsOutput := []string{}, []string{}
     ioTime, sleepTime := []time.Duration{}, []time.Duration{}
